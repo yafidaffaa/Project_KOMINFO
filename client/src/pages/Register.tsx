@@ -7,7 +7,7 @@ const Register = () => {
     <div className="grid md:grid-cols-2 min-h-screen">
 
       {/* Logo - akan tampil di atas di mobile */}
-      <div className="w-full bg-secondary flex items-center justify-center py-6 md:min-h-screen order-1 md:order-2">
+      <div className="bg-secondary flex items-center justify-center py-6 md:py-0 md:min-h-screen order-1 md:order-2">
         <img src={logo} alt="Logo" className="w-20 sm:w-24 md:w-48" />
       </div>
 
