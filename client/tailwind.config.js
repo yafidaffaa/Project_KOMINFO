@@ -8,9 +8,11 @@ export default {
     extend: {
       colors: {
         primary: '#8CEF78',
-        secondary: '#AFF4A1',    // contoh: biru tua elegan
-        accent: '#95B3D52E',       // abu-abu muda untuk latar
+        secondary: '#AFF4A1',
+        homegreen: '#D8FFD0',   
+        accent: '#95B3D52E',     
         dark: '#1a1a1a',
+        footer: '#9EF5BF',
       },
     },
   },
