@@ -1,23 +1,26 @@
-import logo from '@/assets/logo.png';
-import { Link } from 'react-router-dom';
+import React from "react";
+import logo from "@/assets/logo.png";
+import { User } from "lucide-react";
 
-const Header = () => {
+
+
+const Header = ({ username = "Guest" }: { username?: string }) => {
     return (
-        <header className="bg-primary p-4 flex items-center justify-between border-b border-black">
-            {/* Logo + Judul */}
-            <div className="flex items-center space-x-4">
-                <img src={logo} alt="Logo" className="w-12" />
-                <h1 className="font-bold text-lg md:text-xl text-black">
-                    Dinas Komunikasi Informatika Persandian Yogyakarta
-                </h1>
+        <div className="bg-white border-b border-gray-300">
+            <div className="flex items-center justify-between px-4 md:px-10 py-3">
+                <div className="flex items-center gap-3">
+                    <img src={logo} alt="Logo" className="w-8 md:w-10" />
+                    <h1 className="text-xs md:text-sm font-semibold leading-tight text-black">
+                        DINAS KOMUNIKASI DAN INFORMATIKA<br />PERSANDIAN YOGYAKARTA
+                    </h1>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-black">
+                    <User size={20} />
+                    <span>{username}</span>
+                </div>
             </div>
-
-            {/* Link Login + Register */}
-            <div className="flex space-x-4 text-sm">
-                <Link to="/login" className="italic hover:underline">Masuk</Link>
-                <Link to="/register" className="italic hover:underline">Daftar</Link>
-            </div>
-        </header>
+            <div className="bg-primary h-12 w-full" />
+        </div>
     );
 };
 
