@@ -6,6 +6,7 @@ import Footer from "../../components/footer";
 
 const FormPengaduan = () => {
 
+
     type Layanan = {
         id: number;
         nama_layanan: string;
@@ -82,8 +83,7 @@ const FormPengaduan = () => {
                         {/* Submit Button */}
                         <button
                             type="submit"
-                            className="w-full bg-primary hover:bg-secondary text-black font-semibold py-2 rounded-full"
-                        >
+                            className="w-full bg-primary hover:bg-secondary text-black font-semibold py-2 rounded-full">
                             Kirim
                         </button>
                     </form>

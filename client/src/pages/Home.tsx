@@ -9,35 +9,32 @@ import selesaiIcon from "@/assets/selesai.png";
 
 const Home = () => {
   return (
-    <div className="min-h-screen bg-homegreen flex flex-col overflow-x-hidden scroll-smooth">
+    <div className="min-h-screen  bg-homegreen flex flex-col overflow-x-hidden scroll-smooth">
       {/* Header */}
-      <header className="flex items-center justify-between p-4 md:px-12 bg-homegreen sticky top-0 z-10">
+      <header className="flex items-center justify-between px-4 md:px-12 py-4  bg-homegreen sticky top-0 z-10">
         <div className="flex items-center gap-2">
           <img src={logo} alt="Logo" className="w-8 md:w-10" />
           <h1 className="text-xs md:text-sm font-semibold leading-tight text-black">
             DINAS KOMUNIKASI DAN INFORMATIKA<br />PERSANDIAN YOGYAKARTA
           </h1>
         </div>
-        <nav className="space-x-4 text-black italic hidden md:block text-sm">
-          <a href="#home" className="hover:underline">Home</a>
-          <a href="#alur" className="hover:underline">Alur</a>
+        <nav className="space-x-6 text-black font-medium italic text-sm">
+          <Link to="/daftaraduan" className="hover:underline">Daftar Aduan</Link>
+          <Link to="/tentangkami" className="hover:underline">Tentang kami</Link>
           <a href="#kontak" className="hover:underline">Kontak</a>
         </nav>
       </header>
 
-      {/* Hero Section */}
-      <section
-        className="flex flex-col md:flex-row items-center justify-between px-6 md:px-12 py-14 md:py-20 min-h-[80vh]"
-        id="home"
-      >
+      {/* Hero */}
+      <section className="flex flex-col md:flex-row items-center justify-between px-6 md:px-12 py-12 md:py-20" id="tentang">
         <div className="md:w-1/2 space-y-6">
-          <h2 className="text-3xl md:text-5xl font-semibold italic">
-            Layanan Pengaduan Kendala<br />Aplikasi / Website Pemerintah
+          <h2 className="text-3xl md:text-4xl font-semibold italic">
+            Layanan Pengaduan Kendala<br />Aplikasi/Website Pemerintah
           </h2>
-          <p className="text-base md:text-lg text-gray-800">
-            Sampaikan laporan jika Anda mengalami masalah saat menggunakan layanan digital pemerintah.
+          <p className="text-gray-700">
+            Sampaikan laporan jika anda mengalami masalah saat menggunakan layanan digital pemerintah.
           </p>
-          <div className="space-x-4">
+          <div className="flex gap-4">
             <Link to="/login">
               <button className="bg-blue-400 text-white px-6 py-2 rounded-full hover:bg-blue-500">Login</button>
             </Link>
@@ -51,9 +48,9 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Alur Laporan */}
-      <section id="alur" className="py-20 px-6 md:px-16 text-center bg-gradient-to-b from-homegreen to-primary">
-        <h3 className="text-2xl md:text-3xl font-bold mb-16">Alur Penanganan Laporan</h3>
+      {/* Alur */}
+      <section id="alur" className="py-20 px-6 md:px-16 text-center  bg-homegreen">
+        <h3 className="text-2xl md:text-3xl font-bold mb-12">Alur Penanganan Laporan</h3>
         <div className="flex flex-col md:flex-row justify-between items-start gap-12">
           {[{
             icon: catatIcon,
@@ -62,15 +59,15 @@ const Home = () => {
           }, {
             icon: validasiIcon,
             title: "Proses Validasi",
-            desc: "Tim akan memeriksa dan memverifikasi laporan Anda."
+            desc: "Tim akan memverifikasi informasi laporan Anda."
           }, {
             icon: teknisiIcon,
             title: "Tindak Lanjut",
-            desc: "Masalah yang valid akan segera diteruskan ke teknisi."
+            desc: "Masalah yang valid akan diteruskan ke teknisi."
           }, {
             icon: selesaiIcon,
             title: "Penyelesaian",
-            desc: "Anda akan diberi notifikasi setelah kendala ditangani."
+            desc: "Laporan ditangani dan pelapor akan mendapat notifikasi."
           }].map((step, index) => (
             <div key={index} className="flex-1 flex flex-col items-center max-w-xs mx-auto">
               <img src={step.icon} alt={step.title} className="w-16 mb-4" />
@@ -79,15 +76,68 @@ const Home = () => {
             </div>
           ))}
         </div>
-        <div className="h-20" />
+      </section>
+
+      {/* Search Aduan */}
+      <section className=" bg-homegreen px-6 md:px-20 py-10 text-center">
+        <h4 className="font-semibold text-xl mb-4">CARI ADUAN ANDA DISINI</h4>
+        <div className="flex justify-center gap-4 max-w-xl mx-auto">
+          <input
+            type="text"
+            placeholder="cari laporan"
+            className="w-full border border-gray-400 rounded-full px-4 py-2 text-sm"
+          />
+          <button className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-full">CARI</button>
+        </div>
+      </section>
+
+      {/* Statistik */}
+      <section className="bg-white py-8">
+        <div className="flex justify-center items-center gap-8 text-center">
+          {[
+            { label: "Jumlah Aduan", value: 250 },
+            { label: "Proses", value: 30 },
+            { label: "Selesai", value: 130 },
+          ].map((stat, idx) => (
+            <div key={idx} className="border px-6 py-4 rounded-md shadow-md">
+              <p className="text-sm font-semibold text-gray-600">{stat.label}</p>
+              <p className="text-2xl font-bold text-black">{stat.value}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Daftar Aduan */}
+      <section id="aduan" className="py-16 px-6 md:px-20 bg-gradient-to-b from-homegreen to-primary">
+        <h3 className="text-2xl font-bold mb-6 text-center">Daftar aduan</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {Array.from({ length: 9 }).map((_, i) => (
+            <div key={i} className="bg-white border rounded-md p-4 shadow hover:shadow-lg transition">
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-semibold">JSS</span>
+                <span className="text-xs text-gray-500">Status: Proses</span>
+              </div>
+              <p className="text-sm text-gray-700 mb-4">
+                Verifikasi struktural gagal dengan keterangan tertentu. Terjadi pada permohonan tertentu.
+              </p>
+              <div className="text-xs text-gray-600 flex justify-between">
+                <span>👤 asep</span>
+                <span>📅 20/07/2025</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="text-right mt-6">
+          <a href="#" className="text-sm text-blue-600 hover:underline">Lihat lebih banyak &gt;</a>
+        </div>
       </section>
 
       {/* Footer */}
-      <footer id="kontak" className="bg-footer py-6 px-4 md:px-12 text-center text-xs text-gray-800 ">
+      <footer id="kontak" className="bg-footer py-6 px-4 md:px-12 text-center text-xs text-gray-800">
         <p>
           Dinas Komunikasi Informatika dan Persandian © 2025 Pemerintah Kota Yogyakarta<br />
-          Jl. Kenari No. 56 Yogyakarta Telp. (0274) 515865, 561270 Fax. (0274) 561270 Email :
-          <a href="mailto:kominfosandi@jogjakota.go.id" className="text-blue-700 hover:underline ml-1">
+          Jl. Kenari No. 56 Yogyakarta Telp. (0274) 515865, 561270 Fax. (0274) 561270 Email:{" "}
+          <a href="mailto:kominfosandi@jogjakota.go.id" className="text-blue-700 hover:underline">
             kominfosandi@jogjakota.go.id
           </a>
         </p>
