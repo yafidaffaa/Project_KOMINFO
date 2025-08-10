@@ -82,7 +82,7 @@ app.use('/bug-history', authMiddleware, bugHistoryRoutes);
 console.log('📦 Semua route berhasil dimuat.');
 
 // ⚙️ Sync Database
-sequelize.sync({ force: true })
+sequelize.sync({ alter: true })
   .then(() => console.log('✅ Database synced'))
   .catch(err => console.error('❌ Failed to sync DB:', err));
 

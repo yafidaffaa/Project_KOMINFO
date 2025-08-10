@@ -68,36 +68,69 @@ const login = async (req, res) => {
 // REGISTER USER UMUM
 // ========================
 const register = async (req, res) => {
-  const { username, password, nama, nik_user, alamat, email } = req.body;
+  const { username, password, konfirmasiPassword, nama, nik_user, email } = req.body;
 
-  if (!username || !password || !nama || !nik_user) {
-    return res.status(400).json({ message: 'Data tidak lengkap' });
+  // === Validasi input dasar ===
+  if (!username || !password || !konfirmasiPassword || !nama || !nik_user) {
+    return res.status(400).json({ message: 'Data wajib tidak lengkap' });
+  }
+
+  // === Validasi password ===
+  if (password !== konfirmasiPassword) {
+    return res.status(400).json({ message: 'Password dan konfirmasi password tidak cocok' });
+  }
+
+  // === Validasi NIK panjang (16 digit) ===
+  if (nik_user.length !== 16 || !/^\d+$/.test(nik_user)) {
+    return res.status(400).json({ message: 'NIK harus terdiri dari 16 digit angka' });
+  }
+
+  // === Validasi email jika ada ===
+  if (email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: 'Format email tidak valid' });
+    }
   }
 
   try {
+    // === Cek apakah username sudah dipakai ===
     const existing = await Akun.findOne({ where: { username } });
-    if (existing) return res.status(409).json({ message: 'Username sudah digunakan' });
+    if (existing) {
+      return res.status(409).json({ message: 'Username sudah digunakan' });
+    }
 
+    // === Hash password ===
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // === Simpan ke tabel akun ===
     const akunBaru = await Akun.create({
       username,
       password: hashedPassword,
       role: 'user_umum'
     });
 
+    // === Simpan ke tabel user_umum ===
     await UserUmum.create({
       nik_user,
       nama,
-      alamat,
       email,
       id_akun: akunBaru.id_akun
     });
 
-    res.status(201).json({ message: 'Registrasi berhasil' });
+    return res.status(201).json({
+      message: 'Registrasi berhasil',
+      data: {
+        username,
+        nama,
+        nik_user,
+        email
+      }
+    });
+
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error saat registrasi' });
+    console.error('Error saat registrasi user umum:', error);
+    return res.status(500).json({ message: 'Terjadi kesalahan saat proses registrasi' });
   }
 };
 

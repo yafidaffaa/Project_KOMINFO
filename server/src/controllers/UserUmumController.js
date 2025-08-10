@@ -2,9 +2,27 @@ const UserUmum = require('../models/user_umum');
 const Akun = require('../models/akun');
 const bcrypt = require('bcrypt');
 
-// Membuat user baru (khusus digunakan admin pusat, bukan register umum)
+// Membuat user umum baru (oleh admin super)
 const createUserUmum = async (req, res) => {
-  const { username, password, nama_lengkap, nik_user, alamat, email } = req.body;
+  const { username, password, nama, nik_user, email } = req.body;
+
+  // Validasi minimal
+  if (!username || !password || !nama || !nik_user) {
+    return res.status(400).json({ message: 'Data wajib tidak lengkap' });
+  }
+
+  // Validasi NIK 16 digit
+  if (nik_user.length !== 16 || !/^\d+$/.test(nik_user)) {
+    return res.status(400).json({ message: 'NIK harus terdiri dari 16 digit angka' });
+  }
+
+  // Validasi email jika ada
+  if (email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: 'Format email tidak valid' });
+    }
+  }
 
   try {
     const existing = await Akun.findOne({ where: { username } });
@@ -15,18 +33,18 @@ const createUserUmum = async (req, res) => {
     const akunBaru = await Akun.create({
       username,
       password: hashedPassword,
-      role: 'user'
+      role: 'user_umum'  // Pastikan role ini konsisten dengan sistem login
     });
 
     const user = await UserUmum.create({
       nik_user,
-      nama_lengkap,
-      alamat,
+      nama: nama,
       email,
       id_akun: akunBaru.id_akun
     });
 
     res.status(201).json({ message: 'User berhasil dibuat', user });
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Gagal membuat user', error: error.message });
@@ -44,7 +62,7 @@ const getAllUserUmum = async (req, res) => {
   }
 };
 
-// Menampilkan satu user berdasarkan NIK
+// Menampilkan user berdasarkan NIK
 const getUserUmumById = async (req, res) => {
   try {
     const user = await UserUmum.findOne({
@@ -67,8 +85,17 @@ const updateUserUmum = async (req, res) => {
 
     if (!user) return res.status(404).json({ message: 'User tidak ditemukan' });
 
-    await user.update(req.body);
+    // Batasi field yang bisa diupdate kalau perlu (opsional)
+    const allowedFields = ['nama', 'email'];
+    const updateData = {};
+    allowedFields.forEach(field => {
+      if (req.body[field]) updateData[field] = req.body[field];
+    });
+
+    await user.update(updateData);
+
     res.json({ message: 'Data user berhasil diperbarui', user });
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Gagal memperbarui data user', error: error.message });
@@ -82,8 +109,12 @@ const deleteUserUmum = async (req, res) => {
 
     if (!user) return res.status(404).json({ message: 'User tidak ditemukan' });
 
+    // Hapus akun sekaligus user_umum
     await Akun.destroy({ where: { id_akun: user.id_akun } });
+    await user.destroy();
+
     res.json({ message: 'User berhasil dihapus' });
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Gagal menghapus user', error: error.message });

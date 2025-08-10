@@ -16,10 +16,6 @@ const UserUmum = sequelize.define('UserUmum', {
     type: DataTypes.STRING(100),
     allowNull: true
   },
-  alamat: {
-    type: DataTypes.STRING(255),
-    allowNull: true
-  },
   id_akun: {
     type: DataTypes.INTEGER,
     allowNull: false,
