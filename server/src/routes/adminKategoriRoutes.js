@@ -5,14 +5,12 @@ const authMiddleware = require('../middlewares/authMiddleware');
 const roleMiddleware = require('../middlewares/roleMiddleware');
 
 router.use(authMiddleware);
-router.use(roleMiddleware(['admin_kategori']));
+router.use(roleMiddleware('admin_sa', 'admin_kategori'));
 
-router.get('/layanan', adminKategoriController.getAllLayanan);
-router.get('/layanan/:id', adminKategoriController.getLayananById);
-router.post('/layanan', adminKategoriController.createLayanan);
-router.put('/layanan/:id', adminKategoriController.updateLayanan);
-router.delete('/layanan/:id', adminKategoriController.deleteLayanan);
-
-router.put('/revisi-layanan/:id', adminKategoriController.revisiLayanan);
+router.get('/', adminKategoriController.getAllAdminKategori);
+router.get('/:nik', adminKategoriController.getAdminKategoriById);
+router.post('/', adminKategoriController.createAdminKategori);
+router.put('/:nik', adminKategoriController.updateAdminKategori);
+router.delete('/:nik', adminKategoriController.deleteAdminKategori);
 
 module.exports = router;

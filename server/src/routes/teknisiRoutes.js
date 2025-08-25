@@ -6,7 +6,7 @@ const roleMiddleware = require('../middlewares/roleMiddleware');
 
 // Middleware: hanya untuk admin
 router.use(authMiddleware);
-router.use(roleMiddleware(['admin']));
+router.use(roleMiddleware('admin_sa', 'admin_kategori'));
 
 // 📌 CRUD Teknisi
 router.post('/', teknisiController.createTeknisi);               // Tambah teknisi

@@ -4,15 +4,50 @@ const bugReportController = require('../controllers/BugReportController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const roleMiddleware = require('../middlewares/roleMiddleware');
 
+// Semua route butuh autentikasi
 router.use(authMiddleware);
 
-// 📌 Untuk user & pencatat — membuat & melihat laporan sendiri
-router.post('/', roleMiddleware(['user', 'pencatat']), bugReportController.createBug);                 // ✅ createBug
-router.get('/my-reports', roleMiddleware(['user', 'pencatat']), bugReportController.getBugsByUser);   // ✅ getBugsByUser
-router.get('/my-reports/:id', roleMiddleware(['user', 'pencatat']), bugReportController.getBugById);   // ✅ getBugById
+// 📌 CREATE laporan bug
+router.post(
+  '/',
+  roleMiddleware('user_umum', 'pencatat', 'admin_sa'),
+  bugReportController.createBug
+);
 
-// 📌 Untuk validator — memfilter laporan berdasarkan layanan yang ditangani
-router.get('/laporan', roleMiddleware(['validator']), bugReportController.getBugsByValidatorKategori); // ✅ getBugsByValidatorKategori
-router.put('/laporan/:id/status', roleMiddleware(['validator']), bugReportController.updateStatus);    // ✅ updateStatus
+// 📌 GET semua bug (list sesuai role)
+router.get(
+  '/',
+  roleMiddleware('user_umum', 'pencatat', 'validator', 'admin_kategori','admin_sa'),
+  bugReportController.getBugs
+);
+
+// 📌 GET detail bug berdasarkan ID
+router.get(
+  '/:id',
+  roleMiddleware('user_umum', 'pencatat', 'validator', 'admin_kategori','admin_sa'),
+  bugReportController.getBugById
+);
+
+// 📌 GET foto bug utama
+// router.get(
+//   '/:id/photo',
+//   roleMiddleware('user_umum', 'pencatat', 'validator', 'admin_sa'),
+//   bugReportController.getBugPhoto
+// );
+
+// 📌 UPDATE bug
+router.put(
+  '/:id',
+  roleMiddleware('user_umum', 'pencatat', 'validator', 'admin_kategori', 'admin_sa'),
+  bugReportController.updateBug
+);
+
+// 📌 DELETE bug
+router.delete(
+  '/:id',
+  roleMiddleware('admin_sa'),
+  bugReportController.deleteBug
+);
+
 
 module.exports = router;

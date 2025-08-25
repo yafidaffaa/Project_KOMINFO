@@ -17,7 +17,7 @@ const BugCategory = sequelize.define('BugCategory', {
     allowNull: true
   },
   nik_validator: {
-    type: DataTypes.CHAR(18),
+    type: DataTypes.CHAR(16),
     allowNull: false,
     references: {
       model: Validator,
@@ -32,6 +32,6 @@ const BugCategory = sequelize.define('BugCategory', {
 });
 
 // Relasi
-BugCategory.belongsTo(Validator, { foreignKey: 'nik_validator' });
+BugCategory.belongsTo(Validator, { foreignKey: 'nik_validator', as: 'validator' });
 
 module.exports = BugCategory;

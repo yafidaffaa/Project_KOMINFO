@@ -10,30 +10,21 @@ const BugReport = sequelize.define('BugReport', {
     autoIncrement: true,
     primaryKey: true,
   },
-  judul: {
-    type: DataTypes.STRING(100),
-    allowNull: false
-  },
-  deskripsi: {
-    type: DataTypes.TEXT,
-    allowNull: false
-  },
-  tanggal_lapor: {
-    type: DataTypes.DATE,
-    allowNull: false
-  },
-  status: {
-    type: DataTypes.ENUM('diajukan', 'diproses', 'revisi by admin', 'selesai', 'dianggap selesai'),
-    allowNull: false,
-    defaultValue: 'diajukan'
-  },
-  id_kategori: {
+  id_bug_category: { // disamakan dengan DB
     type: DataTypes.INTEGER,
     allowNull: false,
     references: {
       model: BugCategory,
       key: 'id_kategori'
     }
+  },
+  deskripsi: {
+    type: DataTypes.TEXT,
+    allowNull: false
+  },
+  tanggal_laporan: { // disamakan dengan DB
+    type: DataTypes.DATE,
+    allowNull: false
   },
   nik_user: {
     type: DataTypes.CHAR(16),
@@ -44,12 +35,25 @@ const BugReport = sequelize.define('BugReport', {
     }
   },
   nik_pencatat: {
-    type: DataTypes.CHAR(18),
+    type: DataTypes.CHAR(16), // disamakan dengan DB
     allowNull: true,
     references: {
       model: Pencatat,
       key: 'nik_pencatat'
     }
+  },
+  status: {
+    type: DataTypes.ENUM('diajukan', 'diproses', 'revisi_by_admin', 'selesai', 'pendapat_selesai'),
+    allowNull: false,
+    defaultValue: 'diajukan'
+  },
+  photo_bug: {
+    type: DataTypes.BLOB('long'),
+    allowNull: true
+  },
+  ket_validator: {
+    type: DataTypes.TEXT,
+    allowNull: true
   }
 }, {
   tableName: 'bug_report',
@@ -59,7 +63,7 @@ const BugReport = sequelize.define('BugReport', {
 });
 
 // Relasi
-BugReport.belongsTo(BugCategory, { foreignKey: 'id_kategori' });
+BugReport.belongsTo(BugCategory, { foreignKey: 'id_bug_category' });
 BugReport.belongsTo(UserUmum, { foreignKey: 'nik_user' });
 BugReport.belongsTo(Pencatat, { foreignKey: 'nik_pencatat' });
 

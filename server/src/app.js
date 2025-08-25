@@ -3,6 +3,7 @@ require('dotenv').config(); // HARUS paling atas
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
+const bcrypt = require('bcrypt');
 
 const app = express();
 
@@ -54,7 +55,7 @@ const bugHistoryRoutes = require('./routes/bugHistoryRoutes');
 
 // 🗃️ Sequelize & Models
 const sequelize = require('./config/db');
-require('./models/akun');
+const Akun = require('./models/akun');
 require('./models/admin_sa');
 require('./models/validator');
 require('./models/user_umum');
@@ -81,9 +82,41 @@ app.use('/bug-history', authMiddleware, bugHistoryRoutes);
 
 console.log('📦 Semua route berhasil dimuat.');
 
-// ⚙️ Sync Database
+// ⚙️ Sync Database & Seed Admin SA
 sequelize.sync({ alter: true })
-  .then(() => console.log('✅ Database synced'))
+  .then(async () => {
+    console.log('✅ Database synced');
+
+    const AdminSA = require('./models/admin_sa');
+
+    // 🔹 Cek akun
+    let admin = await Akun.findOne({ where: { username: process.env.ADMIN_SA_USERNAME } });
+    if (!admin) {
+      const hashedPassword = await bcrypt.hash(process.env.ADMIN_SA_PASSWORD, 10);
+
+      // 1. Buat akun
+      admin = await Akun.create({
+        username: process.env.ADMIN_SA_USERNAME,
+        password: hashedPassword,
+        role: 'admin_sa' // pastikan role sama kayak yang dipakai sistem
+      });
+
+      // 2. Buat profil AdminSA
+      await AdminSA.create({
+        nik_admin_sa: '1234567890123456',
+        nama: 'Super Admin',
+        no_hp: '081234567890',
+        email: 'adminsa@example.com',
+        alamat: 'Jl. Contoh No.1',
+        nip_admin_sa: '123456789012345678',
+        id_akun: admin.id_akun
+      });
+
+      console.log('✅ Admin SA + profil dibuat otomatis');
+    } else {
+      console.log('ℹ️ Admin SA sudah ada, skip seeding');
+    }
+  })
   .catch(err => console.error('❌ Failed to sync DB:', err));
 
 module.exports = app;

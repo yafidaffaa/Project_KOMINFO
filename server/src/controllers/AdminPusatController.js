@@ -8,6 +8,8 @@ const Teknisi = require('../models/teknisi');
 const AdminKategori = require('../models/admin_kategori');
 const BugReport = require('../models/bug_report');
 
+// =================== CRUD AKUN & PROFIL =================== //
+
 // 1. Melihat semua user (akun)
 const getAllUsers = async (req, res) => {
   try {
@@ -60,7 +62,6 @@ const deleteAkun = async (req, res) => {
     const akun = await Akun.findByPk(id_akun);
     if (!akun) return res.status(404).json({ message: 'Akun tidak ditemukan' });
 
-    // Hapus profil berdasarkan role
     const { role } = akun;
 
     switch (role) {
@@ -85,14 +86,13 @@ const deleteAkun = async (req, res) => {
     }
 
     await akun.destroy();
-
     res.json({ message: 'Akun dan data profil berhasil dihapus' });
   } catch (err) {
     res.status(500).json({ message: 'Gagal menghapus akun', error: err.message });
   }
 };
 
-// 4. Monitoring dashboard: statistik bug dan user
+// 4. Monitoring dashboard
 const getMonitoringData = async (req, res) => {
   try {
     const totalBug = await BugReport.count();
@@ -120,11 +120,11 @@ const getMonitoringData = async (req, res) => {
   }
 };
 
-// 5. Buat akun + data profil berdasarkan role
+// 5. Buat akun + profil berdasarkan role
 const createUser = async (req, res) => {
   const { username, password, role, ...profilData } = req.body;
 
-  const allowedRoles = ['pencatat', 'validator', 'teknisi', 'admin_kategori', 'user_umum'];
+  const allowedRoles = ['admin_sa', 'pencatat', 'validator', 'teknisi', 'admin_kategori', 'user_umum'];
   if (!allowedRoles.includes(role)) {
     return res.status(400).json({ message: 'Role tidak diizinkan' });
   }
@@ -137,6 +137,9 @@ const createUser = async (req, res) => {
     const akunBaru = await Akun.create({ username, password: hashedPassword, role });
 
     switch (role) {
+      case 'admin_sa':
+        await AdminSA.create({ ...profilData, id_akun: akunBaru.id_akun });
+        break;
       case 'pencatat':
         await Pencatat.create({ ...profilData, id_akun: akunBaru.id_akun });
         break;
@@ -160,10 +163,45 @@ const createUser = async (req, res) => {
   }
 };
 
+// 6. Update data admin_sa
+const updateAdminSA = async (req, res) => {
+  const { id } = req.params;
+  const { nama, nip } = req.body;
+
+  try {
+    const admin = await AdminSA.findByPk(id);
+    if (!admin) return res.status(404).json({ message: 'Admin pusat tidak ditemukan' });
+
+    if (nama) admin.nama = nama;
+    if (nip) admin.nip = nip;
+
+    await admin.save();
+    res.json({ message: 'Data admin pusat berhasil diperbarui', admin });
+  } catch (err) {
+    res.status(500).json({ message: 'Gagal memperbarui data admin pusat', error: err.message });
+  }
+};
+
+// 7. Hapus admin_sa saja (tanpa hapus akun)
+const deleteAdminSA = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const admin = await AdminSA.findByPk(id);
+    if (!admin) return res.status(404).json({ message: 'Admin pusat tidak ditemukan' });
+
+    await admin.destroy();
+    res.json({ message: 'Data admin pusat berhasil dihapus' });
+  } catch (err) {
+    res.status(500).json({ message: 'Gagal menghapus data admin pusat', error: err.message });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getUserDetailByRole,
   deleteAkun,
   getMonitoringData,
-  createUser
+  createUser,
+  updateAdminSA,
+  deleteAdminSA
 };

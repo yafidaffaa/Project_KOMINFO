@@ -1,14 +1,40 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/db');
 const BugReport = require('./bug_report');
+const BugCategory = require('./bug_category');
 const Teknisi = require('./teknisi');
 const Validator = require('./validator');
 
 const BugAssign = sequelize.define('BugAssign', {
-  id_assign: {
+  id_bug_assign: { // disamakan dengan DB
     type: DataTypes.INTEGER,
     autoIncrement: true,
     primaryKey: true
+  },
+  id_bug_category: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: BugCategory,
+      key: 'id_kategori'
+    }
+  },
+  deskripsi: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  photo_bug: {
+    type: DataTypes.BLOB('long'),
+    allowNull: true
+  },
+  tanggal_penugasan: {
+    type: DataTypes.DATE,
+    allowNull: false
+  },
+  status: {
+    type: DataTypes.ENUM('diproses', 'selesai', 'pendapat_selesai'),
+    allowNull: false,
+    defaultValue: 'diproses'
   },
   id_bug_report: {
     type: DataTypes.INTEGER,
@@ -18,6 +44,18 @@ const BugAssign = sequelize.define('BugAssign', {
       key: 'id_bug_report'
     }
   },
+  ket_validator: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  validasi_validator: {
+    type: DataTypes.ENUM('disetujui', 'tidak_disetujui'),
+    allowNull: true
+  },
+  catatan_teknisi: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
   nik_teknisi: {
     type: DataTypes.CHAR(18),
     allowNull: false,
@@ -25,23 +63,6 @@ const BugAssign = sequelize.define('BugAssign', {
       model: Teknisi,
       key: 'nik_teknisi'
     }
-  },
-  modul_perbaikan: {
-    type: DataTypes.TEXT,
-    allowNull: true
-  },
-  status: {
-    type: DataTypes.ENUM('diproses', 'selesai', 'pendapat selesai'),
-    allowNull: false,
-    defaultValue: 'diproses'
-  },
-  tanggal_assign: {
-    type: DataTypes.DATE,
-    allowNull: false
-  },
-  validasi_validator: {
-    type: DataTypes.ENUM('disetujui', 'tidak disetujui'),
-    allowNull: true
   },
   nik_validator: {
     type: DataTypes.CHAR(18),
@@ -59,6 +80,7 @@ const BugAssign = sequelize.define('BugAssign', {
 });
 
 // Relasi
+BugAssign.belongsTo(BugCategory, { foreignKey: 'id_bug_category' });
 BugAssign.belongsTo(BugReport, { foreignKey: 'id_bug_report' });
 BugAssign.belongsTo(Teknisi, { foreignKey: 'nik_teknisi' });
 BugAssign.belongsTo(Validator, { foreignKey: 'nik_validator' });

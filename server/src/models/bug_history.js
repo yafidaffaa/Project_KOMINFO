@@ -25,9 +25,24 @@ const BugHistory = sequelize.define('BugHistory', {
       key: 'id_akun'
     }
   },
-  aksi: {
-    type: DataTypes.STRING(255),
+  status: {
+    // ENUM supaya konsisten (bisa ditambah jika ada status baru)
+    type: DataTypes.ENUM(
+      'dibuat',
+      'diajukan',
+      'diproses',
+      'revisi_by_admin',
+      'selesai',
+      'pendapat_selesai',
+      'disetujui',
+      'tidak_disetujui'
+    ),
     allowNull: false
+  },
+  keterangan: {
+    // Opsional, untuk menambah detail aksi (misalnya alasan revisi, catatan teknisi, dll.)
+    type: DataTypes.TEXT,
+    allowNull: true
   },
   tanggal: {
     type: DataTypes.DATE,

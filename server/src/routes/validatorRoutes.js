@@ -6,7 +6,7 @@ const roleMiddleware = require('../middlewares/roleMiddleware');
 
 // Middleware hanya untuk admin pusat
 router.use(authMiddleware);
-router.use(roleMiddleware(['admin']));
+router.use(roleMiddleware('admin_sa', 'admin_kategori'));
 
 // 📌 CRUD Validator
 router.post('/', validatorController.createValidator);             // Tambah validator

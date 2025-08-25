@@ -1,182 +1,199 @@
 const BugAssign = require('../models/bug_assign');
 const BugReport = require('../models/bug_report');
-const Validator = require('../models/validator');
-const Teknisi = require('../models/teknisi');
 const BugCategory = require('../models/bug_category');
+const Teknisi = require('../models/teknisi');
+const Validator = require('../models/validator');
 const BugHistory = require('../models/bug_history');
 
-// 1. Validator → Assign bug ke teknisi (dipanggil otomatis saat status diubah ke "diproses")
-const createAssign = async (req, res) => {
-  const { id_bug_report, nip_teknisi } = req.body;
-  const { id_akun } = req.user;
+// Helper cek role
+const isRole = (user, ...roles) => roles.includes(user.role);
 
+// GET ALL sesuai role
+const getAllAssign = async (req, res) => {
   try {
-    const bug = await BugReport.findByPk(id_bug_report, {
-      include: BugCategory
-    });
-    if (!bug) return res.status(404).json({ message: 'Bug report tidak ditemukan' });
+    let whereClause = {};
 
-    const validator = bug.bug_category?.nip_validator;
-    if (!validator) return res.status(400).json({ message: 'Validator tidak ditemukan dari kategori' });
+    if (isRole(req.user, 'validator')) {
+      whereClause.nik_validator = req.user.nik_validator;
+    } else if (isRole(req.user, 'teknisi')) {
+      whereClause.nik_teknisi = req.user.nik_teknisi;
+    }
+    // admin_sa bisa lihat semua
 
-    const teknisi = await Teknisi.findOne({
-      where: {
-        nip_teknisi,
-        nip_validator: validator // teknisi hanya bisa milik validator yang sama
-      }
-    });
-    if (!teknisi) return res.status(404).json({ message: 'Teknisi tidak sesuai atau tidak ditemukan' });
-
-    const assign = await BugAssign.create({
-      id_bug_report,
-      nip_validator: validator,
-      nip_teknisi,
-      status: 'diproses',
-      modul_perbaikan: null,
-      validasi_validator: null
+    const assigns = await BugAssign.findAll({
+      where: whereClause,
+      attributes: { exclude: ['photo_bug'] },
+      include: [
+        { model: BugReport, attributes: ['id_bug_report', 'deskripsi', 'tanggal_laporan', 'status'] },
+        { model: BugCategory, attributes: ['id_kategori', 'nama_layanan'] },
+        { model: Teknisi, attributes: ['nik_teknisi', 'nama'] },
+        { model: Validator, attributes: ['nik_validator', 'nama'] }
+      ],
+      order: [['tanggal_penugasan', 'DESC']]
     });
 
-    bug.status = 'diproses';
-    await bug.save();
+    const response = assigns.map(a => ({
+      ...a.toJSON(),
+      has_photo: !!a.getDataValue('photo_bug')
+    }));
 
-    await BugHistory.create({
-      id_bug_report,
-      id_akun,
-      aksi: `Validator meng-assign bug ke teknisi (${nip_teknisi})`,
-      tanggal: new Date()
-    });
-
-    res.status(201).json({ message: 'Bug berhasil di-assign ke teknisi', assign });
+    res.json(response);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Gagal meng-assign bug' });
+    res.status(500).json({ message: 'Gagal mengambil data bug assign', error: err.message });
   }
 };
 
-// 2. Teknisi → Lihat semua bug assign miliknya (hanya dari validator yang sama)
-const getAllForTeknisi = async (req, res) => {
-  const { nik_teknisi, nik_validator } = req.user;
-
+// GET DETAIL sesuai role
+const getDetailAssign = async (req, res) => {
   try {
-    const bugAssigns = await BugAssign.findAll({
-      where: {
-        nip_teknisi: nik_teknisi,
-        nip_validator: nik_validator
-      },
-      include: [BugReport]
-    });
-    res.json(bugAssigns);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Gagal mengambil data' });
-  }
-};
+    const { id_bug_assign } = req.params;
+    let whereClause = { id_bug_assign };
 
-// 3. Teknisi → Lihat detail assign
-const getDetailAssignByTeknisi = async (req, res) => {
-  const { id_assign } = req.params;
-  const { nik_teknisi, nik_validator } = req.user;
+    if (isRole(req.user, 'validator')) {
+      whereClause.nik_validator = req.user.nik_validator;
+    } else if (isRole(req.user, 'teknisi')) {
+      whereClause.nik_teknisi = req.user.nik_teknisi;
+    }
+    // admin_sa bisa lihat semua
 
-  try {
     const assign = await BugAssign.findOne({
-      where: {
-        id_assign,
-        nip_teknisi: nik_teknisi,
-        nip_validator: nik_validator
-      },
-      include: [BugReport]
+      where: whereClause,
+      include: [
+        { model: BugReport, attributes: ['id_bug_report', 'deskripsi', 'tanggal_laporan', 'status', 'nik_user', 'nik_pencatat'] },
+        { model: BugCategory, attributes: ['id_kategori', 'nama_layanan'] },
+        { model: Teknisi, attributes: ['nik_teknisi', 'nama', 'email'] },
+        { model: Validator, attributes: ['nik_validator', 'nama', 'email'] }
+      ]
     });
 
-    if (!assign) return res.status(404).json({ message: 'Assign tidak ditemukan atau bukan milik Anda' });
-    res.json(assign);
+    if (!assign) return res.status(404).json({ message: 'Bug assign tidak ditemukan' });
+
+    res.json({
+      ...assign.toJSON(),
+      photo_bug: assign.photo_bug ? assign.photo_bug.toString('base64') : null
+    });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Gagal mengambil detail assign' });
+    res.status(500).json({ message: 'Gagal mengambil detail bug assign', error: err.message });
   }
 };
 
-// 4. Teknisi → Update status & modul
-const updateByTeknisi = async (req, res) => {
-  const { id_assign } = req.params;
-  const { status, modul_perbaikan } = req.body;
-
+// UPDATE sesuai role
+const updateAssign = async (req, res) => {
   try {
-    const assign = await BugAssign.findByPk(id_assign);
-    if (!assign) return res.status(404).json({ message: 'Data tidak ditemukan' });
+    const { id_bug_assign } = req.params;
+    const assign = await BugAssign.findByPk(id_bug_assign);
+    if (!assign) return res.status(404).json({ message: 'Bug assign tidak ditemukan' });
 
-    assign.status = status;
-    assign.modul_perbaikan = modul_perbaikan;
-    await assign.save();
+    let updateData = {};
 
-    await BugHistory.create({
-      id_bug_report: assign.id_bug_report,
-      id_akun: req.user.id_akun,
-      aksi: `Teknisi memperbarui status: ${status}`,
-      tanggal: new Date()
-    });
+    if (isRole(req.user, 'teknisi')) {
+      // hanya milik teknisi
+      if (assign.nik_teknisi !== req.user.nik_teknisi) {
+        return res.status(403).json({ message: 'Data bukan milik Andaaaaaa' });
+      }
+      const { catatan_teknisi, status } = req.body;
+      if (catatan_teknisi !== undefined) updateData.catatan_teknisi = catatan_teknisi;
+      if (status !== undefined) updateData.status = status;
 
-    res.json({ message: 'Berhasil diupdate' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Gagal update data' });
-  }
-};
+      await BugHistory.create({
+        id_bug_report: assign.id_bug_report,
+        id_akun: req.user.id_akun,
+        status: `${status || 'update catatan'}`,
+        tanggal: new Date()
+      });
 
-// 5. Validator → Validasi hasil teknisi
-const validasiByValidator = async (req, res) => {
-  const { id_assign } = req.params;
-  const { validasi_validator } = req.body;
+    } else if (isRole(req.user, 'validator')) {
+      if (assign.nik_validator !== req.user.nik_validator) {
+        return res.status(403).json({ message: 'Data bukan milik Anda' });
+      }
+      const { ket_validator, validasi_validator } = req.body;
+      if (ket_validator !== undefined) updateData.ket_validator = ket_validator;
+      if (validasi_validator !== undefined) {
+        updateData.validasi_validator = validasi_validator;
 
-  try {
-    const assign = await BugAssign.findByPk(id_assign);
-    if (!assign) return res.status(404).json({ message: 'Data tidak ditemukan' });
+        if (validasi_validator === 'disetujui') {
+          await BugReport.update(
+            { status: assign.status },
+            { where: { id_bug_report: assign.id_bug_report } }
+          );
+        } else if (validasi_validator === 'tidak_disetujui') {
+  updateData.status = 'diproses'; // kembalikan status BugAssign ke diproses
 
-    assign.validasi_validator = validasi_validator;
-    await assign.save();
+  await BugReport.update(
+    { status: 'diproses' },
+    { where: { id_bug_report: assign.id_bug_report } }
+  );
+}
 
-    if (validasi_validator === 'disetujui') {
-      const bug = await BugReport.findByPk(assign.id_bug_report);
-      if (bug) {
-        bug.status = assign.status;
-        await bug.save();
       }
 
       await BugHistory.create({
         id_bug_report: assign.id_bug_report,
         id_akun: req.user.id_akun,
-        aksi: `Validator menyetujui hasil perbaikan. Status: ${assign.status}`,
+        status: `${validasi_validator || 'update ket.'}`,
         tanggal: new Date()
       });
+
+    } else if (isRole(req.user, 'admin_sa')) {
+      // admin bisa update semua field bebas
+      updateData = req.body;
+
+      await BugHistory.create({
+        id_bug_report: assign.id_bug_report,
+        id_akun: req.user.id_akun,
+        status: 'Admin_sa melakukan update bug assign',
+        tanggal: new Date()
+      });
+    } else {
+      return res.status(403).json({ message: 'Akses ditolak' });
     }
 
-    res.json({ message: 'Validasi berhasil' });
+    await assign.update(updateData);
+
+    res.json({ message: 'Update bug assign berhasil', assign });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Gagal validasi' });
+    res.status(500).json({ message: 'Gagal update bug assign', error: err.message });
   }
 };
 
-// 6. Validator → Melihat semua assign miliknya
-const getAllForValidator = async (req, res) => {
-  const { nik_validator } = req.user;
-
+// DELETE hanya admin_sa
+const deleteAssign = async (req, res) => {
   try {
-    const bugAssigns = await BugAssign.findAll({
-      where: { nip_validator: nik_validator },
-      include: [BugReport, Teknisi]
+    const { id_bug_assign } = req.params;
+    if (!isRole(req.user, 'admin_sa')) {
+      return res.status(403).json({ message: 'Akses ditolak' });
+    }
+
+    const assign = await BugAssign.findByPk(id_bug_assign);
+    if (!assign) return res.status(404).json({ message: 'Bug assign tidak ditemukan' });
+
+    await BugReport.update(
+      { status: 'diajukan' },
+      { where: { id_bug_report: assign.id_bug_report } }
+    );
+
+    await assign.destroy();
+
+    await BugHistory.create({
+      id_bug_report: assign.id_bug_report,
+      id_akun: req.user.id_akun,
+      status: 'Bug assign dihapus admin_sa',
+      tanggal: new Date()
     });
-    res.json(bugAssigns);
+
+    res.json({ message: 'Bug assign berhasil dihapus' });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Gagal mengambil bug assign' });
+    res.status(500).json({ message: 'Gagal menghapus bug assign', error: err.message });
   }
 };
 
 module.exports = {
-  createAssign,
-  getAllForTeknisi,
-  getDetailAssignByTeknisi,
-  updateByTeknisi,
-  validasiByValidator,
-  getAllForValidator
+  getAllAssign,
+  getDetailAssign,
+  updateAssign,
+  deleteAssign
 };

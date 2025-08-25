@@ -4,21 +4,35 @@ const bugAssignController = require('../controllers/BugAssignController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const roleMiddleware = require('../middlewares/roleMiddleware');
 
+// Middleware global → semua endpoint butuh login
 router.use(authMiddleware);
 
-// Validator → Assign bug ke teknisi (pastikan controller ada fungsi createAssign)
-router.post('/', roleMiddleware(['validator']), bugAssignController.createAssign);
+// ✅ Teknisi / Validator / Admin_sa → Lihat semua bug assign sesuai role
+router.get(
+  '/',
+  roleMiddleware('teknisi', 'validator', 'admin_sa'),
+  (req, res) => bugAssignController.getAllAssign(req, res)
+);
 
-// Teknisi → Lihat bug yang ditugaskan ke dirinya
-router.get('/', roleMiddleware(['teknisi']), bugAssignController.getAllForTeknisi);
+// ✅ Lihat detail bug assign by ID
+router.get(
+  '/:id_bug_assign',
+  roleMiddleware('teknisi', 'validator', 'admin_sa'),
+  (req, res) => bugAssignController.getDetailAssign(req, res)
+);
 
-// (Kalau ada detail assign, pastikan controller ada getDetailAssignByTeknisi)
-router.get('/:id_assign', roleMiddleware(['teknisi']), bugAssignController.getDetailAssignByTeknisi);
+// ✅ Update bug assign (akses berbeda di-handle dalam controller)
+router.put(
+  '/:id_bug_assign',
+  roleMiddleware('teknisi', 'validator', 'admin_sa'),
+  (req, res) => bugAssignController.updateAssign(req, res)
+);
 
-// Update oleh teknisi (status & modul perbaikan)
-router.put('/:id_assign', roleMiddleware(['teknisi']), bugAssignController.updateByTeknisi);
-
-// Validator → Validasi hasil pekerjaan teknisi
-router.put('/:id_assign/validasi', roleMiddleware(['validator']), bugAssignController.validasiByValidator);
+// ✅ Admin_sa → Hapus bug assign
+router.delete(
+  '/:id_bug_assign',
+  roleMiddleware('admin_sa'),
+  (req, res) => bugAssignController.deleteAssign(req, res)
+);
 
 module.exports = router;

@@ -6,7 +6,7 @@ const roleMiddleware = require('../middlewares/roleMiddleware');
 
 // Middleware: hanya admin pusat bisa kelola user umum
 router.use(authMiddleware);
-router.use(roleMiddleware(['admin']));
+router.use(roleMiddleware('admin_sa', 'admin_kategori'));
 
 // 📌 CRUD User Umum
 router.post('/', userUmumController.createUserUmum);          // Tambah user umum

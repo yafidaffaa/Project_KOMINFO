@@ -49,12 +49,28 @@ const login = async (req, res) => {
 
     if (!profil) return res.status(404).json({ message: 'Data profil tidak ditemukan' });
 
-    const token = jwt.sign({
+    // ========================
+    // Buat payload JWT
+    // ========================
+    let payload = {
       id_akun: akun.id_akun,
       username: akun.username,
       role: akun.role,
       nama: profil.nama || profil.nama_lengkap
-    }, process.env.JWT_SECRET || 'SECRET_KEY', { expiresIn: '1h' });
+    };
+
+    // Tambahkan nik_user / nik_pencatat sesuai role
+    if (akun.role === 'user_umum') {
+      payload.nik_user = profil.nik_user;
+    } else if (akun.role === 'pencatat') {
+      payload.nik_pencatat = profil.nik_pencatat;
+    }else if (akun.role === 'validator') {
+      payload.nik_validator = profil.nik_validator;
+    }else if (akun.role === 'teknisi') {
+      payload.nik_teknisi = profil.nik_teknisi;
+    }
+
+    const token = jwt.sign(payload, process.env.JWT_SECRET || 'SECRET_KEY', { expiresIn: '1h' });
 
     res.json({ message: 'Login berhasil', token, profil });
 
