@@ -7,6 +7,9 @@ const roleMiddleware = require('../middlewares/roleMiddleware');
 // Middleware autentikasi dan role admin pusat (admin_sa)
 router.use(authMiddleware);
 router.use(roleMiddleware(['admin_sa']));
+// router.use(roleMiddleware('admin_sa', 'admin_kategori'));
+
+router.get('/dashboard-statistic', adminSaController.getStatistikPengguna);
 
 // Monitoring dashboard (statistik umum)
 router.get('/dashboard', adminSaController.getMonitoringData);

@@ -49,5 +49,12 @@ router.delete(
   bugReportController.deleteBug
 );
 
+// 📌 GET statistik bug berdasarkan /bug-reports/statistik?tahun=2025
+router.get(
+  '/:tahun',
+  roleMiddleware('user_umum', 'pencatat', 'validator','admin_sa'),
+  bugReportController.getBugStatistics
+);
+
 
 module.exports = router;

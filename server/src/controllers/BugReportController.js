@@ -295,11 +295,64 @@ const deleteBug = async (req, res) => {
   }
 };
 
+// Statistik
+const getBugStatistics = async (req, res) => {
+  try {
+    const { tahun } = req.query;
+    if (!tahun) {
+      return res.status(400).json({ message: 'Parameter tahun wajib diisi ?tahun=YYYY' });
+    }
+
+    // filter tahun
+    let whereClause = {
+      tanggal_laporan: {
+        [Op.between]: [new Date(`${tahun}-01-01`), new Date(`${tahun}-12-31`)]
+      }
+    };
+
+    // Filter berdasarkan role
+    if (isRole(req.user, 'user_umum')) {
+      whereClause.nik_user = req.user.nik_user;
+    } else if (isRole(req.user, 'pencatat')) {
+      whereClause.nik_pencatat = req.user.nik_pencatat;
+    } else if (isRole(req.user, 'validator')) {
+      const kategori = await BugCategory.findAll({
+        where: { nik_validator: req.user.nik_validator },
+        attributes: ['id_kategori']
+      });
+      const idKategoriList = kategori.map(k => k.id_kategori);
+      whereClause.id_bug_category = { [Op.in]: idKategoriList };
+    } else if (!isRole(req.user, 'admin_sa')) {
+      return res.status(403).json({ message: 'Akses ditolak' });
+    }
+
+    // Hitung semua statistik
+    const total = await BugReport.count({ where: whereClause });
+    const diajukan = await BugReport.count({ where: { ...whereClause, status: 'diajukan' } });
+    const diproses = await BugReport.count({ where: { ...whereClause, status: 'diproses' } });
+    const selesai = await BugReport.count({ where: { ...whereClause, status: 'selesai' } });
+    const pendapat_selesai = await BugReport.count({ where: { ...whereClause, status: 'pendapat_selesai' } });
+
+    res.json({
+      tahun,
+      total,
+      diajukan,
+      diproses,
+      selesai,
+      pendapat_selesai
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Gagal mengambil statistik bug', error: err.message });
+  }
+};
+
+
 
 module.exports = {
   createBug,
   getBugs,
   getBugById,
   updateBug,
-  deleteBug
+  deleteBug,
+  getBugStatistics
 };

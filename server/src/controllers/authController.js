@@ -1,5 +1,6 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
 
 const Akun = require('../models/akun');
 const AdminSA = require('../models/admin_sa');
@@ -150,4 +151,87 @@ const register = async (req, res) => {
   }
 };
 
-module.exports = { login, register };
+// 3. Lupa password (request reset)
+const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    if (!email) return res.status(400).json({ message: 'Email wajib diisi' });
+
+    // cek apakah email ada di database user_umum
+    const user = await UserUmum.findOne({ where: { email }, include: Akun });
+    if (!user) return res.status(404).json({ message: 'Email tidak ditemukan' });
+
+    // generate token reset (expired 15 menit)
+    const resetToken = jwt.sign(
+      { id_akun: user.id_akun, email },
+      process.env.JWT_SECRET || 'SECRET_KEY',
+      { expiresIn: '15m' }
+    );
+
+    // buat transporter (pakai Gmail SMTP)
+    const transporter = nodemailer.createTransport({
+  host: process.env.EMAIL_HOST,   // contoh: smtp.gmail.com
+  port: process.env.EMAIL_PORT,   // contoh: 587
+  secure: process.env.EMAIL_PORT == 465, // true kalau pakai port 465 (SSL)
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
+});
+
+
+    // isi email
+    const resetLink = `http://localhost:3000/reset-password?token=${resetToken}`;
+    const mailOptions = {
+      from: `"Bug Tracker" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: 'Reset Password',
+      html: `
+        <p>Halo, ${user.nama}</p>
+        <p>Kamu meminta reset password. Klik link di bawah ini (berlaku 15 menit):</p>
+        <a href="${resetLink}">${resetLink}</a>
+        <p>Jika kamu tidak meminta reset, abaikan email ini.</p>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.json({ message: 'Email reset password berhasil dikirim' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Gagal memproses lupa password' });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  const { token, passwordBaru } = req.body;
+
+  try {
+    if (!token || !passwordBaru) {
+      return res.status(400).json({ message: 'Token dan password baru wajib diisi' });
+    }
+
+    // verifikasi token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'SECRET_KEY');
+
+    // hash password baru
+    const bcrypt = require('bcrypt');
+    const hashedPassword = await bcrypt.hash(passwordBaru, 10);
+
+    // update di tabel akun
+    const akun = await Akun.findByPk(decoded.id_akun);
+    if (!akun) return res.status(404).json({ message: 'Akun tidak ditemukan' });
+
+    akun.password = hashedPassword;
+    await akun.save();
+
+    res.json({ message: 'Password berhasil direset' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Token tidak valid atau kadaluarsa' });
+  }
+};
+
+
+module.exports = { login, register, forgotPassword, resetPassword };

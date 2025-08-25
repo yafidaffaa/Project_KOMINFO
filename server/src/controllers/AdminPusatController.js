@@ -196,6 +196,38 @@ const deleteAdminSA = async (req, res) => {
   }
 };
 
+// 8. Statistik jumlah pengguna per role
+const getStatistikPengguna = async (req, res) => {
+  try {
+    // cek otoritas
+    if (!(req.user.role === 'admin_sa' || req.user.role === 'admin_kategori')) {
+      return res.status(403).json({ message: 'Akses ditolak' });
+    }
+
+    const totalUser = await Akun.count();
+    const totalUserUmum = await Akun.count({ where: { role: 'user_umum' } });
+    const totalPencatat = await Akun.count({ where: { role: 'pencatat' } });
+    const totalValidator = await Akun.count({ where: { role: 'validator' } });
+    const totalAdminKategori = await Akun.count({ where: { role: 'admin_kategori' } });
+    const totalTeknisi = await Akun.count({ where: { role: 'teknisi' } });
+
+    res.json({
+      totalUser,
+      totalUserUmum,
+      totalPencatat,
+      totalValidator,
+      totalAdminKategori,
+      totalTeknisi
+    });
+  } catch (err) {
+    res.status(500).json({
+      message: 'Gagal mengambil statistik pengguna',
+      error: err.message
+    });
+  }
+};
+
+
 module.exports = {
   getAllUsers,
   getUserDetailByRole,
@@ -203,5 +235,6 @@ module.exports = {
   getMonitoringData,
   createUser,
   updateAdminSA,
-  deleteAdminSA
+  deleteAdminSA,
+  getStatistikPengguna
 };

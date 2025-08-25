@@ -35,4 +35,12 @@ router.delete(
   (req, res) => bugAssignController.deleteAssign(req, res)
 );
 
+// 📌 GET statistik bug berdasarkan /bug-reports/statistik?tahun=2025
+
+router.get(
+  '/:tahun',
+  roleMiddleware('teknisi', 'validator','admin_sa'),
+  bugAssignController.getStatistikAssign
+);
+
 module.exports = router;

@@ -4,6 +4,7 @@ const BugCategory = require('../models/bug_category');
 const Teknisi = require('../models/teknisi');
 const Validator = require('../models/validator');
 const BugHistory = require('../models/bug_history');
+const { Op } = require("sequelize");
 
 // Helper cek role
 const isRole = (user, ...roles) => roles.includes(user.role);
@@ -191,9 +192,63 @@ const deleteAssign = async (req, res) => {
   }
 };
 
+const getStatistikAssign = async (req, res) => {
+  try {
+    let { tahun } = req.query;
+    if (!tahun) {
+      tahun = new Date().getFullYear(); // default tahun berjalan
+    }
+
+    // Range awal & akhir tahun
+    const startDate = new Date(`${tahun}-01-01 00:00:00`);
+    const endDate = new Date(`${tahun}-12-31 23:59:59`);
+
+    // Filter dasar
+    const whereCondition = {
+      createdAt: {
+        [Op.between]: [startDate, endDate],
+      },
+    };
+
+    // Filter sesuai role
+    if (req.user.role === "teknisi") {
+      whereCondition.nik_teknisi = req.user.nik_teknisi;
+    } else if (req.user.role === "validator") {
+      whereCondition.nik_validator = req.user.nik_validator;
+    }
+
+    // Hitung jumlah
+    const total = await BugAssign.count({ where: whereCondition });
+    const diproses = await BugAssign.count({
+      where: { ...whereCondition, status: "diproses" },
+    });
+    const selesai = await BugAssign.count({
+      where: { ...whereCondition, status: "selesai" },
+    });
+    const pendapatSelesai = await BugAssign.count({
+      where: { ...whereCondition, status: "pendapat_selesai" },
+    });
+
+    return res.json({
+      tahun,
+      total,
+      diproses,
+      selesai,
+      pendapat_selesai: pendapatSelesai,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: "Gagal mengambil statistik bug assign",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getAllAssign,
   getDetailAssign,
   updateAssign,
-  deleteAssign
+  deleteAssign,
+  getStatistikAssign
 };
