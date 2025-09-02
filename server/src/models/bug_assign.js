@@ -44,6 +44,10 @@ const BugAssign = sequelize.define('BugAssign', {
       key: 'id_bug_report'
     }
   },
+  nama_pelapor: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
   ket_validator: {
     type: DataTypes.TEXT,
     allowNull: true

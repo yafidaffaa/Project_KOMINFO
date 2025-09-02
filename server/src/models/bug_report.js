@@ -3,6 +3,7 @@ const sequelize = require('../config/db');
 const BugCategory = require('./bug_category');
 const UserUmum = require('./user_umum');
 const Pencatat = require('./pencatat');
+const AdminSA = require('./admin_sa');
 
 const BugReport = sequelize.define('BugReport', {
   id_bug_report: {
@@ -42,6 +43,14 @@ const BugReport = sequelize.define('BugReport', {
       key: 'nik_pencatat'
     }
   },
+  nik_admin_sa: {
+    type: DataTypes.CHAR(16),
+    allowNull: true,
+    references: {
+      model: AdminSA,
+      key: 'nik_admin_sa'
+    }
+  },
   status: {
     type: DataTypes.ENUM('diajukan', 'diproses', 'revisi_by_admin', 'selesai', 'pendapat_selesai'),
     allowNull: false,
@@ -66,5 +75,6 @@ const BugReport = sequelize.define('BugReport', {
 BugReport.belongsTo(BugCategory, { foreignKey: 'id_bug_category' });
 BugReport.belongsTo(UserUmum, { foreignKey: 'nik_user' });
 BugReport.belongsTo(Pencatat, { foreignKey: 'nik_pencatat' });
+BugReport.belongsTo(AdminSA, { foreignKey: 'nik_admin_sa' });
 
 module.exports = BugReport;

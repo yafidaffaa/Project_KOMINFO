@@ -38,6 +38,7 @@ const createBug = async (req, res) => {
       status: 'diajukan',
       nik_user: req.user.nik_user || null,
       nik_pencatat: req.user.nik_pencatat || null,
+      nik_admin_sa: req.user.nik_admin_sa || null,
       photo_bug: photoBugBuffer,
       ket_validator: ket_validator || null
     });
@@ -106,14 +107,27 @@ const getBugs = async (req, res) => {
         {
           model: BugCategory,
           attributes: ['id_kategori', 'nama_layanan']
-        }
+        },
+        {
+      model: UserUmum,
+      attributes: ['nik_user', 'nama']
+    },
+    {
+      model: Pencatat,
+      attributes: ['nik_pencatat', 'nama']
+    },
+    {
+      model: AdminSA,
+      attributes: ['nik_admin_sa', 'nama']
+    }
       ],
       order: [['tanggal_laporan', 'DESC']]
     });
 
     const transformedBugs = bugs.map(bug => ({
       ...bug.toJSON(),
-      has_photo: !!bug.getDataValue('photo_bug')
+      has_photo: !!bug.getDataValue('photo_bug'),
+      nama_pelapor: bug.UserUmum?.nama || bug.Pencatat?.nama || bug.AdminSA?.nama || null
     }));
 
     res.json(transformedBugs);
@@ -130,7 +144,10 @@ const getBugById = async (req, res) => {
         {
           model: BugCategory,
           attributes: ['id_kategori', 'nama_layanan']
-        }
+        },
+        { model: UserUmum, attributes: ['nik_user', 'nama'] },
+    { model: Pencatat, attributes: ['nik_pencatat', 'nama'] },
+    { model: AdminSA, attributes: ['nik_admin_sa', 'nama'] }
       ]
     });
 
@@ -152,7 +169,8 @@ const getBugById = async (req, res) => {
 
     const response = {
       ...bug.toJSON(),
-      photo_bug: bug.photo_bug ? bug.photo_bug.toString('base64') : null
+      photo_bug: bug.photo_bug ? bug.photo_bug.toString('base64') : null,
+      nama_pelapor: bug.UserUmum?.nama || bug.Pencatat?.nama || bug.AdminSA?.nama || null
     };
 
     res.json(response);
@@ -164,7 +182,14 @@ const getBugById = async (req, res) => {
 // UPDATE
 const updateBug = async (req, res) => {
   try {
-    const bug = await BugReport.findByPk(req.params.id);
+    // ambil bug report + join nama pelapor
+const bug = await BugReport.findByPk(req.params.id, {
+  include: [
+    { model: UserUmum, attributes: ['nama'] },
+    { model: Pencatat, attributes: ['nama'] },
+    { model: AdminSA, attributes: ['nama'] }
+  ]
+});
     if (!bug) return res.status(404).json({ message: 'Bug tidak ditemukan' });
 
     let updateData = {};
@@ -211,6 +236,10 @@ else if (isRole(req.user, 'validator')) {
     return res.status(400).json({ message: 'Tidak ada teknisi untuk validator ini' });
   }
 
+  // tentukan nama pelapor
+  let namaPelapor =
+    bug.UserUmum?.nama || bug.Pencatat?.nama || bug.AdminSA?.nama || null;
+
   // buat penugasan untuk setiap teknisi
   for (const t of teknisis) {
     await BugAssign.create({
@@ -220,6 +249,7 @@ else if (isRole(req.user, 'validator')) {
       tanggal_penugasan: new Date(),
       status: 'diproses',
       id_bug_report: bug.id_bug_report,
+      nama_pelapor: namaPelapor,
       ket_validator: null,
       validasi_validator: null,
       catatan_teknisi: null,
