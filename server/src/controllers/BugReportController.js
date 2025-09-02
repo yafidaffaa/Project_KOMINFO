@@ -3,6 +3,9 @@ const BugCategory = require('../models/bug_category');
 const BugHistory = require('../models/bug_history');
 // const BugPhoto = require('../models/bug_photo'); // aktifkan kalau tabel ada
 const Teknisi = require('../models/teknisi');
+const UserUmum = require('../models/user_umum');
+const Pencatat = require('../models/pencatat');
+const AdminSA = require('../models/admin_sa');
 const BugAssign = require('../models/bug_assign');
 const { Op } = require('sequelize');
 
