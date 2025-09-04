@@ -102,6 +102,7 @@ const updateAssign = async (req, res) => {
         id_bug_report: assign.id_bug_report,
         id_akun: req.user.id_akun,
         status: `${status || 'update catatan'}`,
+        keterangan: `Bug diperbarui oleh ${req.user.role}: ${req.user.username}`,
         tanggal: new Date()
       });
 
@@ -134,6 +135,7 @@ const updateAssign = async (req, res) => {
         id_bug_report: assign.id_bug_report,
         id_akun: req.user.id_akun,
         status: `${validasi_validator || 'update ket.'}`,
+        keterangan: `Bug diperbarui oleh ${req.user.role}: ${req.user.username}`,
         tanggal: new Date()
       });
 
@@ -145,6 +147,7 @@ const updateAssign = async (req, res) => {
         id_bug_report: assign.id_bug_report,
         id_akun: req.user.id_akun,
         status: 'Admin_sa melakukan update bug assign',
+        keterangan: `Bug diperbarui oleh ${req.user.role}: ${req.user.username}`,
         tanggal: new Date()
       });
     } else {
@@ -175,6 +178,11 @@ const deleteAssign = async (req, res) => {
       { status: 'diajukan' },
       { where: { id_bug_report: assign.id_bug_report } }
     );
+
+    await BugHistory.destroy({
+  where: { id_bug_report: assign.id_bug_report }
+});
+
 
     await assign.destroy();
 

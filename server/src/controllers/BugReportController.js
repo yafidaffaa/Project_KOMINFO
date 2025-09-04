@@ -64,6 +64,7 @@ const createBug = async (req, res) => {
       id_bug_report: bug.id_bug_report,
       id_akun: req.user.id_akun,
       status: 'diajukan', // sesuai enum BugReport
+      keterangan: `Laporan dibuat oleh ${req.user.role}: ${req.user.username}`,
       tanggal: new Date()
     });
 
@@ -219,6 +220,10 @@ const bug = await BugReport.findByPk(req.params.id, {
   updateData.status = 'diajukan'; // otomatis jadi diajukan setelah diperbaiki
 }
 else if (isRole(req.user, 'validator')) {
+
+    if (bug.status === 'revisi_by_admin') {
+    return res.status(403).json({ message: 'Bug masih dalam status revisi_by_admin, tunggu admin kategori memperbarui' });
+  }
       const kategori = await BugCategory.findByPk(bug.id_bug_category);
       if (kategori.nik_validator !== req.user.nik_validator) {
         return res.status(403).json({ message: 'Akses ditolak' });
@@ -290,6 +295,7 @@ else if (isRole(req.user, 'validator')) {
       id_bug_report: bug.id_bug_report,
       id_akun: req.user.id_akun,
       status: bug.status,
+      keterangan: `Bug diperbarui oleh ${req.user.role}: ${req.user.username}`,
       tanggal: new Date()
     });
 
