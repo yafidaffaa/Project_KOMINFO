@@ -35,7 +35,9 @@ const BugHistory = sequelize.define('BugHistory', {
       'selesai',
       'pendapat_selesai',
       'disetujui',
-      'tidak_disetujui'
+      'tidak_disetujui',
+      'Bug assign dihapus admin_sa',
+      'Admin_sa melakukan update bug assign'
     ),
     allowNull: false
   },

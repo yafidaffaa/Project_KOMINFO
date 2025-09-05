@@ -101,7 +101,7 @@ const updateAssign = async (req, res) => {
       await BugHistory.create({
         id_bug_report: assign.id_bug_report,
         id_akun: req.user.id_akun,
-        status: `${status || 'update catatan'}`,
+        status: `${status}`,
         keterangan: `Bug diperbarui oleh ${req.user.role}: ${req.user.username}`,
         tanggal: new Date()
       });
@@ -134,7 +134,7 @@ const updateAssign = async (req, res) => {
       await BugHistory.create({
         id_bug_report: assign.id_bug_report,
         id_akun: req.user.id_akun,
-        status: `${validasi_validator || 'update ket.'}`,
+        status: `${validasi_validator}`,
         keterangan: `Bug diperbarui oleh ${req.user.role}: ${req.user.username}`,
         tanggal: new Date()
       });
