@@ -166,7 +166,7 @@ const forgotPassword = async (req, res) => {
     const resetToken = jwt.sign(
       { id_akun: user.id_akun, email },
       process.env.JWT_SECRET || 'SECRET_KEY',
-      { expiresIn: '15m' }
+      { expiresIn: '5m' }
     );
 
     // buat transporter (pakai Gmail SMTP)
@@ -182,14 +182,14 @@ const forgotPassword = async (req, res) => {
 
 
     // isi email
-    const resetLink = `http://localhost:3000/reset-password?token=${resetToken}`;
+    const resetLink = `http://${process.env.HOST}:3000/auth/reset-password?token=${resetToken}`;
     const mailOptions = {
-      from: `"Bug Tracker" <${process.env.EMAIL_USER}>`,
+      from: `"Bug Handling Kominfosan Yogya" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: 'Reset Password',
       html: `
         <p>Halo, ${user.nama}</p>
-        <p>Kamu meminta reset password. Klik link di bawah ini (berlaku 15 menit):</p>
+        <p>Kamu meminta reset password. Klik link di bawah ini (berlaku 5 menit):</p>
         <a href="${resetLink}">${resetLink}</a>
         <p>Jika kamu tidak meminta reset, abaikan email ini.</p>
       `
