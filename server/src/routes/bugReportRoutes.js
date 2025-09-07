@@ -3,6 +3,10 @@ const router = express.Router();
 const bugReportController = require('../controllers/BugReportController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const roleMiddleware = require('../middlewares/roleMiddleware');
+const multer = require('multer');
+
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
 // Semua route butuh autentikasi
 router.use(authMiddleware);
@@ -11,6 +15,7 @@ router.use(authMiddleware);
 router.post(
   '/',
   roleMiddleware('user_umum', 'pencatat', 'admin_sa'),
+  upload.array('photos', 5),
   bugReportController.createBug
 );
 
@@ -28,17 +33,11 @@ router.get(
   bugReportController.getBugById
 );
 
-// 📌 GET foto bug utama
-// router.get(
-//   '/:id/photo',
-//   roleMiddleware('user_umum', 'pencatat', 'validator', 'admin_sa'),
-//   bugReportController.getBugPhoto
-// );
-
 // 📌 UPDATE bug
 router.put(
   '/:id',
   roleMiddleware('user_umum', 'pencatat', 'validator', 'admin_kategori', 'admin_sa'),
+  upload.array('photos', 5),
   bugReportController.updateBug
 );
 

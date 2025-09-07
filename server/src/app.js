@@ -52,6 +52,9 @@ const bugCategoryRoutes = require('./routes/bugCategoryRoutes');
 const bugReportRoutes = require('./routes/bugReportRoutes');
 const bugAssignRoutes = require('./routes/bugAssignRoutes');
 const bugHistoryRoutes = require('./routes/bugHistoryRoutes');
+const bugPhotoRoutes = require('./routes/bugPhotoRoutes');
+
+const supabase = require('./config/supabase');
 
 // 🗃️ Sequelize & Models
 const sequelize = require('./config/db');
@@ -66,6 +69,7 @@ require('./models/bug_category');
 require('./models/bug_report');
 require('./models/bug_assign');
 require('./models/bug_history');
+require('./models/bug_photo');
 
 // 📢 Load Routes
 app.use('/auth', authRoutes);
@@ -79,6 +83,9 @@ app.use('/bug-category', authMiddleware, bugCategoryRoutes);
 app.use('/bug-report', authMiddleware, bugReportRoutes);
 app.use('/bug-assign', authMiddleware, bugAssignRoutes);
 app.use('/bug-history', authMiddleware, bugHistoryRoutes);
+app.use('/bug-photos', authMiddleware, bugPhotoRoutes);
+
+console.log('Supabase bucket:', process.env.SUPABASE_BUCKET);
 
 console.log('📦 Semua route berhasil dimuat.');
 

@@ -24,9 +24,9 @@ const BugAssign = sequelize.define('BugAssign', {
     allowNull: true
   },
   photo_bug: {
-    type: DataTypes.BLOB('long'),
-    allowNull: true
-  },
+  type: DataTypes.ENUM('ada', 'tidak ada'),
+  allowNull: false,
+},
   tanggal_penugasan: {
     type: DataTypes.DATE,
     allowNull: false

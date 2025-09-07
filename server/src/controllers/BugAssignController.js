@@ -4,6 +4,7 @@ const BugCategory = require('../models/bug_category');
 const Teknisi = require('../models/teknisi');
 const Validator = require('../models/validator');
 const BugHistory = require('../models/bug_history');
+const BugPhoto = require('../models/bug_photo');
 const { Op } = require("sequelize");
 
 // Helper cek role
@@ -19,13 +20,20 @@ const getAllAssign = async (req, res) => {
     } else if (isRole(req.user, 'teknisi')) {
       whereClause.nik_teknisi = req.user.nik_teknisi;
     }
-    // admin_sa bisa lihat semua
 
     const assigns = await BugAssign.findAll({
       where: whereClause,
-      attributes: { exclude: ['photo_bug'] },
       include: [
-        { model: BugReport, attributes: ['id_bug_report', 'deskripsi', 'tanggal_laporan', 'status'] },
+        { 
+          model: BugReport,
+          attributes: ['id_bug_report', 'deskripsi', 'tanggal_laporan', 'status', 'nik_user', 'nik_pencatat', 'nik_admin_sa'],
+          include: [
+            { model: UserUmum, attributes: ['nama'] },
+            { model: Pencatat, attributes: ['nama'] },
+            { model: AdminSA, attributes: ['nama'] },
+            { model: BugPhoto, attributes: ['id_bug_photo', 'photo_url'] } // tambahin foto
+          ]
+        },
         { model: BugCategory, attributes: ['id_kategori', 'nama_layanan'] },
         { model: Teknisi, attributes: ['nik_teknisi', 'nama'] },
         { model: Validator, attributes: ['nik_validator', 'nama'] }
@@ -33,10 +41,17 @@ const getAllAssign = async (req, res) => {
       order: [['tanggal_penugasan', 'DESC']]
     });
 
-    const response = assigns.map(a => ({
-      ...a.toJSON(),
-      has_photo: !!a.getDataValue('photo_bug')
-    }));
+    const response = assigns.map(a => {
+      const bug = a.BugReport;
+      const namaPelapor = bug.UserUmum?.nama || bug.Pencatat?.nama || bug.AdminSA?.nama || null;
+      const photos = bug.BugPhotos || [];
+      return { 
+        ...a.toJSON(), 
+        nama_pelapor: namaPelapor,
+        ada_photo: photos.length > 0,
+        photos: photos.map(p => ({ id: p.id_bug_photo, url: p.photo_url }))
+      };
+    });
 
     res.json(response);
   } catch (err) {
@@ -44,6 +59,7 @@ const getAllAssign = async (req, res) => {
     res.status(500).json({ message: 'Gagal mengambil data bug assign', error: err.message });
   }
 };
+
 
 // GET DETAIL sesuai role
 const getDetailAssign = async (req, res) => {
@@ -56,12 +72,20 @@ const getDetailAssign = async (req, res) => {
     } else if (isRole(req.user, 'teknisi')) {
       whereClause.nik_teknisi = req.user.nik_teknisi;
     }
-    // admin_sa bisa lihat semua
 
     const assign = await BugAssign.findOne({
       where: whereClause,
       include: [
-        { model: BugReport, attributes: ['id_bug_report', 'deskripsi', 'tanggal_laporan', 'status', 'nik_user', 'nik_pencatat'] },
+        { 
+          model: BugReport,
+          attributes: ['id_bug_report', 'deskripsi', 'tanggal_laporan', 'status', 'nik_user', 'nik_pencatat', 'nik_admin_sa'],
+          include: [
+            { model: UserUmum, attributes: ['nama'] },
+            { model: Pencatat, attributes: ['nama'] },
+            { model: AdminSA, attributes: ['nama'] },
+            { model: BugPhoto, attributes: ['id_bug_photo', 'photo_url'] } // tambahin foto
+          ]
+        },
         { model: BugCategory, attributes: ['id_kategori', 'nama_layanan'] },
         { model: Teknisi, attributes: ['nik_teknisi', 'nama', 'email'] },
         { model: Validator, attributes: ['nik_validator', 'nama', 'email'] }
@@ -70,15 +94,22 @@ const getDetailAssign = async (req, res) => {
 
     if (!assign) return res.status(404).json({ message: 'Bug assign tidak ditemukan' });
 
-    res.json({
-      ...assign.toJSON(),
-      photo_bug: assign.photo_bug ? assign.photo_bug.toString('base64') : null
+    const bug = assign.BugReport;
+    const namaPelapor = bug.UserUmum?.nama || bug.Pencatat?.nama || bug.AdminSA?.nama || null;
+    const photos = bug.BugPhotos || [];
+
+    res.json({ 
+      ...assign.toJSON(), 
+      nama_pelapor: namaPelapor,
+      ada_photo: photos.length > 0,
+      photos: photos.map(p => ({ id: p.id_bug_photo, url: p.photo_url }))
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Gagal mengambil detail bug assign', error: err.message });
   }
 };
+
 
 // UPDATE sesuai role
 const updateAssign = async (req, res) => {
@@ -92,7 +123,7 @@ const updateAssign = async (req, res) => {
     if (isRole(req.user, 'teknisi')) {
       // hanya milik teknisi
       if (assign.nik_teknisi !== req.user.nik_teknisi) {
-        return res.status(403).json({ message: 'Data bukan milik Andaaaaaa' });
+        return res.status(403).json({ message: 'Data bukan milik Anda' });
       }
       const { catatan_teknisi, status } = req.body;
       if (catatan_teknisi !== undefined) updateData.catatan_teknisi = catatan_teknisi;
@@ -102,7 +133,7 @@ const updateAssign = async (req, res) => {
         id_bug_report: assign.id_bug_report,
         id_akun: req.user.id_akun,
         status: `${status}`,
-        keterangan: `Bug diperbarui oleh ${req.user.role}: ${req.user.username}`,
+        keterangan: `Bug assign diperbarui oleh ${req.user.role}: ${req.user.username}`,
         tanggal: new Date()
       });
 
@@ -121,21 +152,20 @@ const updateAssign = async (req, res) => {
             { where: { id_bug_report: assign.id_bug_report } }
           );
         } else if (validasi_validator === 'tidak_disetujui') {
-  updateData.status = 'diproses'; // kembalikan status BugAssign ke diproses
+          updateData.status = 'diproses'; // kembalikan status BugAssign ke diproses
 
-  await BugReport.update(
-    { status: 'diproses' },
-    { where: { id_bug_report: assign.id_bug_report } }
-  );
-}
-
+          await BugReport.update(
+            { status: 'diproses' },
+            { where: { id_bug_report: assign.id_bug_report } }
+          );
+        }
       }
 
       await BugHistory.create({
         id_bug_report: assign.id_bug_report,
         id_akun: req.user.id_akun,
         status: `${validasi_validator}`,
-        keterangan: `Bug diperbarui oleh ${req.user.role}: ${req.user.username}`,
+        keterangan: `Bug assign diperbarui oleh ${req.user.role}: ${req.user.username}`,
         tanggal: new Date()
       });
 
@@ -147,7 +177,7 @@ const updateAssign = async (req, res) => {
         id_bug_report: assign.id_bug_report,
         id_akun: req.user.id_akun,
         status: 'Admin_sa melakukan update bug assign',
-        keterangan: `Bug diperbarui oleh ${req.user.role}: ${req.user.username}`,
+        keterangan: `Bug assign diperbarui oleh ${req.user.role}: ${req.user.username}`,
         tanggal: new Date()
       });
     } else {
@@ -174,15 +204,19 @@ const deleteAssign = async (req, res) => {
     const assign = await BugAssign.findByPk(id_bug_assign);
     if (!assign) return res.status(404).json({ message: 'Bug assign tidak ditemukan' });
 
+    // Update status BugReport kembali ke diajukan
     await BugReport.update(
       { status: 'diajukan' },
       { where: { id_bug_report: assign.id_bug_report } }
     );
 
+    // Hapus history terkait bug assign
     await BugHistory.destroy({
-  where: { id_bug_report: assign.id_bug_report }
-});
-
+      where: { 
+        id_bug_report: assign.id_bug_report,
+        keterangan: { [Op.like]: '%bug assign%' } // hanya hapus history yang terkait bug assign
+      }
+    });
 
     await assign.destroy();
 
@@ -190,6 +224,7 @@ const deleteAssign = async (req, res) => {
       id_bug_report: assign.id_bug_report,
       id_akun: req.user.id_akun,
       status: 'Bug assign dihapus admin_sa',
+      keterangan: `Bug assign dihapus oleh ${req.user.role}: ${req.user.username}`,
       tanggal: new Date()
     });
 

@@ -162,7 +162,7 @@ const forgotPassword = async (req, res) => {
     const user = await UserUmum.findOne({ where: { email }, include: Akun });
     if (!user) return res.status(404).json({ message: 'Email tidak ditemukan' });
 
-    // generate token reset (expired 15 menit)
+    // generate token reset (expired 5 menit)
     const resetToken = jwt.sign(
       { id_akun: user.id_akun, email },
       process.env.JWT_SECRET || 'SECRET_KEY',
