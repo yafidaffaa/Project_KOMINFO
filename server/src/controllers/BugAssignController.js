@@ -5,12 +5,16 @@ const Teknisi = require('../models/teknisi');
 const Validator = require('../models/validator');
 const BugHistory = require('../models/bug_history');
 const BugPhoto = require('../models/bug_photo');
+// ADD MISSING IMPORTS
+const UserUmum = require('../models/user_umum');
+const Pencatat = require('../models/pencatat');
+const AdminSA = require('../models/admin_sa');
 const { Op } = require("sequelize");
 
 // Helper cek role
 const isRole = (user, ...roles) => roles.includes(user.role);
 
-// GET ALL sesuai role
+// ENHANCED: GET ALL sesuai role dengan photo_info konsisten
 const getAllAssign = async (req, res) => {
   try {
     let whereClause = {};
@@ -26,12 +30,11 @@ const getAllAssign = async (req, res) => {
       include: [
         { 
           model: BugReport,
-          attributes: ['id_bug_report', 'deskripsi', 'tanggal_laporan', 'status', 'nik_user', 'nik_pencatat', 'nik_admin_sa'],
+          attributes: ['id_bug_report', 'deskripsi', 'tanggal_laporan', 'status', 'photo_bug', 'nik_user', 'nik_pencatat', 'nik_admin_sa'],
           include: [
             { model: UserUmum, attributes: ['nama'] },
             { model: Pencatat, attributes: ['nama'] },
-            { model: AdminSA, attributes: ['nama'] },
-            { model: BugPhoto, attributes: ['id_bug_photo', 'photo_url'] } // tambahin foto
+            { model: AdminSA, attributes: ['nama'] }
           ]
         },
         { model: BugCategory, attributes: ['id_kategori', 'nama_layanan'] },
@@ -41,17 +44,33 @@ const getAllAssign = async (req, res) => {
       order: [['tanggal_penugasan', 'DESC']]
     });
 
-    const response = assigns.map(a => {
-      const bug = a.BugReport;
+    const response = await Promise.all(assigns.map(async (assign) => {
+      const bug = assign.BugReport;
       const namaPelapor = bug.UserUmum?.nama || bug.Pencatat?.nama || bug.AdminSA?.nama || null;
-      const photos = bug.BugPhotos || [];
-      return { 
-        ...a.toJSON(), 
-        nama_pelapor: namaPelapor,
-        ada_photo: photos.length > 0,
-        photos: photos.map(p => ({ id: p.id_bug_photo, url: p.photo_url }))
+      
+      // ENHANCED: Konsisten dengan format photo_info seperti di Bug Report
+      let photoInfo = {
+        has_photo: bug.photo_bug === 'ada',
+        photo_count: 0,
+        photo_endpoint: `/api/bug-photos/${bug.id_bug_report}`,
+        can_view_photos: false
       };
-    });
+
+      if (bug.photo_bug === 'ada') {
+        const photoCount = await BugPhoto.count({
+          where: { id_bug_report: bug.id_bug_report }
+        });
+
+        photoInfo.photo_count = photoCount;
+        photoInfo.can_view_photos = true;
+      }
+
+      return { 
+        ...assign.toJSON(), 
+        nama_pelapor: namaPelapor,
+        photo_info: photoInfo
+      };
+    }));
 
     res.json(response);
   } catch (err) {
@@ -61,7 +80,7 @@ const getAllAssign = async (req, res) => {
 };
 
 
-// GET DETAIL sesuai role
+// ENHANCED: GET DETAIL sesuai role dengan photo_info konsisten
 const getDetailAssign = async (req, res) => {
   try {
     const { id_bug_assign } = req.params;
@@ -78,12 +97,11 @@ const getDetailAssign = async (req, res) => {
       include: [
         { 
           model: BugReport,
-          attributes: ['id_bug_report', 'deskripsi', 'tanggal_laporan', 'status', 'nik_user', 'nik_pencatat', 'nik_admin_sa'],
+          attributes: ['id_bug_report', 'deskripsi', 'tanggal_laporan', 'status', 'photo_bug', 'nik_user', 'nik_pencatat', 'nik_admin_sa'],
           include: [
             { model: UserUmum, attributes: ['nama'] },
             { model: Pencatat, attributes: ['nama'] },
-            { model: AdminSA, attributes: ['nama'] },
-            { model: BugPhoto, attributes: ['id_bug_photo', 'photo_url'] } // tambahin foto
+            { model: AdminSA, attributes: ['nama'] }
           ]
         },
         { model: BugCategory, attributes: ['id_kategori', 'nama_layanan'] },
@@ -96,13 +114,33 @@ const getDetailAssign = async (req, res) => {
 
     const bug = assign.BugReport;
     const namaPelapor = bug.UserUmum?.nama || bug.Pencatat?.nama || bug.AdminSA?.nama || null;
-    const photos = bug.BugPhotos || [];
+
+    // IMPROVED: Photo endpoint hanya ada jika memang ada foto
+    let photoInfo = {
+      has_photo: bug.photo_bug === 'ada',
+      photo_count: 0,
+      photo_endpoint: null,
+      can_view_photos: false
+    };
+
+    // Hanya set endpoint jika memang ada foto
+    if (bug.photo_bug === 'ada') {
+      const photoCount = await BugPhoto.count({
+        where: { id_bug_report: bug.id_bug_report }
+      });
+
+      // Hanya set endpoint jika benar-benar ada foto di database
+      if (photoCount > 0) {
+        photoInfo.photo_count = photoCount;
+        photoInfo.photo_endpoint = `/bug-photos/bug-report/${bug.id_bug_report}`;
+        photoInfo.can_view_photos = true;
+      }
+    }
 
     res.json({ 
       ...assign.toJSON(), 
       nama_pelapor: namaPelapor,
-      ada_photo: photos.length > 0,
-      photos: photos.map(p => ({ id: p.id_bug_photo, url: p.photo_url }))
+      photo_info: photoInfo
     });
   } catch (err) {
     console.error(err);

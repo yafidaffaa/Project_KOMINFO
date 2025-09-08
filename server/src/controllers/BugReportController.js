@@ -93,7 +93,7 @@ const createBug = async (req, res) => {
   }
 };
 
-// READ List
+// ENHANCED: READ List dengan informasi photo endpoint yang lebih logis
 const getBugs = async (req, res) => {
   try {
     let whereClause = {};
@@ -112,7 +112,6 @@ const getBugs = async (req, res) => {
 
     const bugs = await BugReport.findAll({
       where: whereClause,
-      // FIXED: tidak perlu exclude photo_bug karena sekarang hanya string
       include: [
         {
           model: BugCategory,
@@ -134,10 +133,45 @@ const getBugs = async (req, res) => {
       order: [['tanggal_laporan', 'DESC']]
     });
 
-    const transformedBugs = bugs.map(bug => ({
-      ...bug.toJSON(),
-      // FIXED: photo_bug sudah ada di response, tidak perlu transform has_photo
-      nama_pelapor: bug.UserUmum?.nama || bug.Pencatat?.nama || bug.AdminSA?.nama || null
+    const transformedBugs = await Promise.all(bugs.map(async (bug) => {
+      const bugJson = bug.toJSON();
+      const nama_pelapor = bug.UserUmum?.nama || bug.Pencatat?.nama || bug.AdminSA?.nama || null;
+      
+      // IMPROVED: Photo endpoint hanya ada jika memang ada foto
+      let photoInfo = {
+        has_photo: bugJson.photo_bug === 'ada',
+        photo_count: 0,
+        photo_endpoint: null, // Default null
+        can_view_photos: false
+      };
+
+      // Hanya set endpoint dan hitung foto jika memang ada foto
+      if (bugJson.photo_bug === 'ada') {
+        const photoCount = await BugPhoto.count({
+          where: { id_bug_report: bug.id_bug_report }
+        });
+
+        // Hanya set endpoint jika benar-benar ada foto di database
+        if (photoCount > 0) {
+          photoInfo = {
+            has_photo: true,
+            photo_count: photoCount,
+            photo_endpoint: `/bug-photos/bug-report/${bug.id_bug_report}`,
+            can_view_photos: true
+          };
+        } else {
+          // Ada inconsistency: photo_bug = 'ada' tapi tidak ada foto di BugPhoto table
+          // Reset photo_bug ke 'tidak ada'
+          await bug.update({ photo_bug: 'tidak ada' });
+          photoInfo.has_photo = false;
+        }
+      }
+
+      return {
+        ...bugJson,
+        nama_pelapor,
+        photo_info: photoInfo
+      };
     }));
 
     res.json(transformedBugs);
@@ -146,7 +180,7 @@ const getBugs = async (req, res) => {
   }
 };
 
-// READ Detail
+// ENHANCED: READ Detail dengan logika photo endpoint yang benar
 const getBugById = async (req, res) => {
   try {
     const bug = await BugReport.findByPk(req.params.id, {
@@ -177,10 +211,74 @@ const getBugById = async (req, res) => {
       }
     }
 
+    const bugJson = bug.toJSON();
+    const nama_pelapor = bug.UserUmum?.nama || bug.Pencatat?.nama || bug.AdminSA?.nama || null;
+
+    // IMPROVED: Photo info dengan logika yang lebih konsisten
+    let photoInfo = {
+      has_photo: bugJson.photo_bug === 'ada',
+      photo_count: 0,
+      photo_endpoint: null, // Default null
+      can_view_photos: false,
+      can_upload_photos: false,
+      can_delete_photos: false,
+      upload_endpoint: null // Endpoint khusus untuk upload (via update)
+    };
+
+    // Check permission untuk upload/delete foto terlebih dahulu
+    const user = req.user;
+    let canManagePhotos = false;
+
+    if (isRole(user, 'admin_sa')) {
+      canManagePhotos = true;
+    } else if (isRole(user, 'user_umum') && bug.nik_user === user.nik_user) {
+      canManagePhotos = true;
+    } else if (isRole(user, 'pencatat') && bug.nik_pencatat === user.nik_pencatat) {
+      canManagePhotos = true;
+    }
+
+    // Jika ada foto, set viewing info
+    if (bugJson.photo_bug === 'ada') {
+      const photoCount = await BugPhoto.count({
+        where: { id_bug_report: bug.id_bug_report }
+      });
+
+      if (photoCount > 0) {
+        photoInfo.photo_count = photoCount;
+        photoInfo.photo_endpoint = `/bug-photos/bug-report/${bug.id_bug_report}`;
+        photoInfo.can_view_photos = true;
+        
+        // Hanya bisa delete jika punya permission dan ada foto
+        photoInfo.can_delete_photos = canManagePhotos;
+      } else {
+        // Inconsistency: reset photo_bug
+        await bug.update({ photo_bug: 'tidak ada' });
+        photoInfo.has_photo = false;
+      }
+    }
+
+    // Upload permission - bisa upload foto baru via update endpoint jika:
+    // 1. Punya permission untuk manage photos
+    // 2. Bug masih dalam status yang bisa diedit (tergantung role)
+    if (canManagePhotos) {
+      let canUpload = false;
+      
+      if (isRole(user, 'admin_sa')) {
+        canUpload = true; // Admin bisa upload kapan saja
+      } else if (bugJson.status === 'diajukan') {
+        canUpload = true; // User/pencatat bisa upload jika status masih diajukan
+      }
+      
+      if (canUpload) {
+        photoInfo.can_upload_photos = true;
+        photoInfo.upload_endpoint = `/bug-reports/${bug.id_bug_report}`;
+      }
+    }
+
     const response = {
-      ...bug.toJSON(),
-      nama_pelapor: bug.UserUmum?.nama || bug.Pencatat?.nama || bug.AdminSA?.nama || null
-      // FIXED: hapus konversi base64, photo_bug sudah string biasa
+      ...bugJson,
+      nama_pelapor,
+      photo_info: photoInfo
     };
 
     res.json(response);
@@ -189,7 +287,7 @@ const getBugById = async (req, res) => {
   }
 };
 
-// UPDATE
+// UPDATE dengan validasi duplikasi BugAssign yang lebih komprehensif
 const updateBug = async (req, res) => {
   try {
     // ambil bug report + join nama pelapor
@@ -214,7 +312,7 @@ const updateBug = async (req, res) => {
         ket_validator: ket_validator || bug.ket_validator
       };
 
-      // FIXED: Handle foto untuk admin_sa - upload ke Firebase dan BugPhoto table
+      // Handle foto untuk admin_sa
       const photoFiles = req.files || [];
       if (photoFiles.length > 0) {
         if (photoFiles.length > 5) {
@@ -246,6 +344,7 @@ const updateBug = async (req, res) => {
 
         updateData.photo_bug = 'ada';
       }
+
     } else if (isRole(req.user, 'admin_kategori')) {
       if (bug.status !== 'revisi_by_admin') {
         return res.status(403).json({ message: 'Bug hanya bisa diupdate ketika status revisi_by_admin' });
@@ -253,6 +352,7 @@ const updateBug = async (req, res) => {
 
       updateData.id_bug_category = req.body.id_bug_category || bug.id_bug_category;
       updateData.status = 'diajukan'; // otomatis jadi diajukan setelah diperbaiki
+
     } else if (isRole(req.user, 'validator')) {
       if (bug.status === 'revisi_by_admin') {
         return res.status(403).json({ message: 'Bug masih dalam status revisi_by_admin, tunggu admin kategori memperbarui' });
@@ -268,27 +368,71 @@ const updateBug = async (req, res) => {
         ket_validator: req.body.ket_validator || bug.ket_validator
       };
 
-      // Kalau status diubah ke diproses → insert ke BugAssign
-      if (req.body.status === 'diproses' && bug.status !== 'diproses') {
-        // ambil semua teknisi yang punya nik_validator sama dengan validator ini
+      // IMPROVED: Validasi BugAssign untuk semua kasus status 'diproses'
+      if (req.body.status === 'diproses') {
+        
+        // VALIDASI 1: Cek apakah sudah ada BugAssign untuk bug report ini
+        const existingAssign = await BugAssign.findOne({
+          where: { id_bug_report: bug.id_bug_report }
+        });
+
+        if (existingAssign) {
+          // Jika status sebelumnya sudah 'diproses' dan mau diubah ke 'diproses' lagi
+          if (bug.status === 'diproses') {
+            return res.status(409).json({ 
+              message: 'Bug report sudah dalam status diproses',
+              detail: `Bug assign dengan ID ${existingAssign.id_bug_assign} sudah dibuat sebelumnya. Status tidak dapat diubah ke 'diproses' lagi.`,
+              existing_assign_id: existingAssign.id_bug_assign,
+              current_status: bug.status,
+              requested_status: req.body.status
+            });
+          } else {
+            // Jika status sebelumnya bukan 'diproses' tapi sudah ada BugAssign
+            return res.status(409).json({ 
+              message: 'Bug assign sudah ada untuk laporan ini',
+              detail: `Bug assign dengan ID ${existingAssign.id_bug_assign} sudah dibuat sebelumnya`,
+              existing_assign_id: existingAssign.id_bug_assign,
+              current_status: bug.status,
+              requested_status: req.body.status
+            });
+          }
+        }
+
+        // VALIDASI 2: Ambil teknisi dan pastikan ada
         const teknisis = await Teknisi.findAll({
           where: { nik_validator: req.user.nik_validator }
         });
 
         if (teknisis.length === 0) {
-          return res.status(400).json({ message: 'Tidak ada teknisi untuk validator ini' });
+          return res.status(400).json({ 
+            message: 'Tidak ada teknisi untuk validator ini',
+            detail: 'Tidak dapat mengubah status ke diproses karena tidak ada teknisi yang terdaftar untuk validator ini'
+          });
         }
 
-        // tentukan nama pelapor
-        let namaPelapor =
-          bug.UserUmum?.nama || bug.Pencatat?.nama || bug.AdminSA?.nama || null;
+        // VALIDASI 3: Double check - cek lagi apakah ada yang concurrent create
+        const doubleCheckAssign = await BugAssign.findOne({
+          where: { id_bug_report: bug.id_bug_report }
+        });
 
-        // buat penugasan untuk setiap teknisi
+        if (doubleCheckAssign) {
+          return res.status(409).json({ 
+            message: 'Bug assign sudah dibuat oleh proses lain',
+            detail: 'Terjadi concurrent creation, silakan refresh dan cek kembali',
+            existing_assign_id: doubleCheckAssign.id_bug_assign
+          });
+        }
+
+        // Jika semua validasi passed, buat BugAssign
+        const namaPelapor = bug.UserUmum?.nama || bug.Pencatat?.nama || bug.AdminSA?.nama || null;
+
+        // Buat penugasan untuk setiap teknisi
+        const createdAssigns = [];
         for (const t of teknisis) {
-          await BugAssign.create({
+          const newAssign = await BugAssign.create({
             id_bug_category: bug.id_bug_category,
             deskripsi: bug.deskripsi,
-            photo_bug: bug.photo_bug, // FIXED: ini sudah string 'ada'/'tidak ada'
+            photo_bug: bug.photo_bug,
             tanggal_penugasan: new Date(),
             status: 'diproses',
             id_bug_report: bug.id_bug_report,
@@ -299,8 +443,26 @@ const updateBug = async (req, res) => {
             nik_teknisi: t.nik_teknisi,
             nik_validator: req.user.nik_validator
           });
+          createdAssigns.push(newAssign.id_bug_assign);
+        }
+
+        // Log untuk tracking
+        console.log(`BugAssign created for bug ${bug.id_bug_report}:`, createdAssigns);
+      }
+
+      // ADDITIONAL: Validasi untuk kasus lain jika perlu memberikan info
+      else if (bug.status === 'diproses' && req.body.status && req.body.status !== 'diproses') {
+        // Jika status sekarang 'diproses' dan mau diubah ke status lain, cek apakah ada BugAssign
+        const existingAssign = await BugAssign.findOne({
+          where: { id_bug_report: bug.id_bug_report }
+        });
+
+        if (existingAssign) {
+          // Ini informational saja, tidak block update
+          console.log(`Info: Bug report ${bug.id_bug_report} memiliki BugAssign ${existingAssign.id_bug_assign}, status akan diubah dari ${bug.status} ke ${req.body.status}`);
         }
       }
+
     } else if (isRole(req.user, 'user_umum', 'pencatat')) {
       if (bug.status !== 'diajukan') {
         return res.status(403).json({ message: 'Bug sudah tidak dapat diubah' });
@@ -315,7 +477,7 @@ const updateBug = async (req, res) => {
 
       updateData.deskripsi = req.body.deskripsi || bug.deskripsi;
       
-      // FIXED: Handle foto untuk user_umum/pencatat - upload ke Firebase dan BugPhoto table
+      // Handle foto untuk user_umum/pencatat
       const photoFiles = req.files || [];
       if (photoFiles.length > 0) {
         if (photoFiles.length > 5) {
@@ -347,6 +509,7 @@ const updateBug = async (req, res) => {
 
         updateData.photo_bug = 'ada';
       }
+
     } else {
       return res.status(403).json({ message: 'Akses ditolak' });
     }
@@ -357,18 +520,19 @@ const updateBug = async (req, res) => {
     await BugHistory.create({
       id_bug_report: bug.id_bug_report,
       id_akun: req.user.id_akun,
-      status: bug.status,
+      status: updateData.status || bug.status,
       keterangan: `Bug diperbarui oleh ${req.user.role}: ${req.user.username}`,
       tanggal: new Date()
     });
 
     const response = {
       ...bug.toJSON(),
-      // FIXED: tidak perlu manipulasi photo_bug, sudah langsung string
+      ...updateData
     };
 
     res.json({ message: 'Bug diperbarui', bug: response });
   } catch (err) {
+    console.error('Error updating bug:', err);
     res.status(500).json({ message: 'Gagal memperbarui bug', error: err.message });
   }
 };
