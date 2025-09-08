@@ -572,7 +572,7 @@ const deleteBug = async (req, res) => {
   }
 };
 
-// Statistik Bug Report
+// FIXED: getBugStatistics dengan timezone yang benar
 const getBugStatistics = async (req, res) => {
   try {
     let { tahun } = req.query;
@@ -580,11 +580,11 @@ const getBugStatistics = async (req, res) => {
       tahun = new Date().getFullYear(); // default tahun berjalan
     }
 
-    // Range awal & akhir tahun
-    const startDate = new Date(`${tahun}-01-01 00:00:00`);
-    const endDate = new Date(`${tahun}-12-31 23:59:59`);
+    // FIXED: Range dengan UTC explicit untuk menghindari timezone shift
+    const startDate = new Date(`${tahun}-01-01T00:00:00.000Z`);
+    const endDate = new Date(`${tahun}-12-31T23:59:59.999Z`);
 
-    // Filter dasar - GUNAKAN tanggal_laporan (snake_case)
+    // Filter dasar
     const whereCondition = {
       tanggal_laporan: {
         [Op.between]: [startDate, endDate],
@@ -607,8 +607,8 @@ const getBugStatistics = async (req, res) => {
       return res.status(403).json({ message: 'Akses ditolak' });
     }
 
-    console.log('📊 Where condition:', whereCondition); // Debug log
-    console.log('🎯 Date range:', { startDate, endDate }); // Debug log
+    console.log('📊 Bug Report Where condition:', whereCondition);
+    console.log('🎯 Date range (UTC):', { startDate, endDate });
 
     // Hitung semua statistik
     const total = await BugReport.count({ where: whereCondition });
@@ -636,7 +636,7 @@ const getBugStatistics = async (req, res) => {
   } catch (error) {
     console.error('❌ Error in getBugStatistics:', error);
     return res.status(500).json({ 
-      message: 'Gagal mengambil statistik bug', 
+      message: 'Gagal mengambil statistik bug report', 
       error: error.message 
     });
   }

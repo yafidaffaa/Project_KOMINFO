@@ -273,6 +273,7 @@ const deleteAssign = async (req, res) => {
   }
 };
 
+// FIXED: getStatistikAssign dengan timezone yang benar  
 const getStatistikAssign = async (req, res) => {
   try {
     let { tahun } = req.query;
@@ -280,26 +281,28 @@ const getStatistikAssign = async (req, res) => {
       tahun = new Date().getFullYear(); // default tahun berjalan
     }
 
-    // Range awal & akhir tahun
-    const startDate = new Date(`${tahun}-01-01 00:00:00`);
-    const endDate = new Date(`${tahun}-12-31 23:59:59`);
+    // FIXED: Range dengan UTC explicit untuk menghindari timezone shift
+    const startDate = new Date(`${tahun}-01-01T00:00:00.000Z`);
+    const endDate = new Date(`${tahun}-12-31T23:59:59.999Z`);
 
-    // Filter dasar - GUNAKAN created_at (snake_case)
+    // Filter dasar
     const whereCondition = {
-      created_at: {  // ← Gunakan created_at (snake_case)
+      tanggal_penugasan: {
         [Op.between]: [startDate, endDate],
       },
     };
 
     // Filter sesuai role
-    if (req.user.role === "teknisi") {
+    if (isRole(req.user, 'teknisi')) {
       whereCondition.nik_teknisi = req.user.nik_teknisi;
-    } else if (req.user.role === "validator") {
+    } else if (isRole(req.user, 'validator')) {
       whereCondition.nik_validator = req.user.nik_validator;
+    } else if (!isRole(req.user, 'admin_sa')) {
+      return res.status(403).json({ message: 'Akses ditolak' });
     }
 
-    console.log('📊 Where condition:', whereCondition); // Debug log
-    console.log('🎯 Date range:', { startDate, endDate }); // Debug log
+    console.log('📊 Bug Assign Where condition:', whereCondition);
+    console.log('🎯 Date range (UTC):', { startDate, endDate });
 
     // Hitung jumlah
     const total = await BugAssign.count({ where: whereCondition });
