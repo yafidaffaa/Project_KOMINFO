@@ -26,7 +26,7 @@ const Validator = sequelize.define('Validator', {
   },
   nip_validator: {
     type: DataTypes.CHAR(18),
-    allowNull: false  // Pegawai pemerintah → wajib NIP
+    allowNull: false
   },
   id_akun: {
     type: DataTypes.INTEGER,

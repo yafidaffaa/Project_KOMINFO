@@ -217,5 +217,5 @@ module.exports = {
   uploadToSupabase,
   deleteFromSupabase,
   validateImageFile,
-  cleanupOrphanedFiles, // TAMBAHAN: untuk cleanup manual
+  cleanupOrphanedFiles,
 };

@@ -11,7 +11,7 @@ const BugReport = sequelize.define('BugReport', {
     autoIncrement: true,
     primaryKey: true,
   },
-  id_bug_category: { // disamakan dengan DB
+  id_bug_category: {
     type: DataTypes.INTEGER,
     allowNull: false,
     references: {
@@ -23,7 +23,7 @@ const BugReport = sequelize.define('BugReport', {
     type: DataTypes.TEXT,
     allowNull: false
   },
-  tanggal_laporan: { // disamakan dengan DB
+  tanggal_laporan: {
     type: DataTypes.DATE,
     allowNull: false
   },
@@ -36,7 +36,7 @@ const BugReport = sequelize.define('BugReport', {
     }
   },
   nik_pencatat: {
-    type: DataTypes.CHAR(16), // disamakan dengan DB
+    type: DataTypes.CHAR(16),
     allowNull: true,
     references: {
       model: Pencatat,

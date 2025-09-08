@@ -17,7 +17,7 @@ const BugPhoto = sequelize.define('BugPhoto', {
     }
   },
   photo_url: {
-    type: DataTypes.TEXT, // URL Firebase
+    type: DataTypes.TEXT, // URL Supabase
     allowNull: false
   },
   photo_name: {

@@ -3,7 +3,6 @@ const Akun = require('../models/akun');
 const bcrypt = require('bcrypt');
 
 // Membuat pencatat baru
-// Membuat pencatat baru
 const createPencatat = async (req, res) => {
   const { username, password, nik_pencatat, nip_pencatat, nama, alamat, email, no_hp } = req.body;
 

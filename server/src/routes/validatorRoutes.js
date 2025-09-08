@@ -8,7 +8,7 @@ const roleMiddleware = require('../middlewares/roleMiddleware');
 router.use(authMiddleware);
 router.use(roleMiddleware('admin_sa', 'admin_kategori'));
 
-// 📌 CRUD Validator
+// CRUD Validator
 router.post('/', validatorController.createValidator);             // Tambah validator
 router.get('/', validatorController.getAllValidator);              // Semua validator
 router.get('/:nik', validatorController.getValidatorById);         // Detail validator

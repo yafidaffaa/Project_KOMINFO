@@ -27,7 +27,7 @@ const Teknisi = sequelize.define('Teknisi', {
   },
   nip_teknisi: {
     type: DataTypes.CHAR(18),
-    allowNull: false  // WAJIB karena teknisi adalah pegawai pemerintah
+    allowNull: false
   },
   id_akun: {
     type: DataTypes.INTEGER,

@@ -8,7 +8,7 @@ const roleMiddleware = require('../middlewares/roleMiddleware');
 router.use(authMiddleware);
 router.use(roleMiddleware('admin_sa', 'admin_kategori'));
 
-// 📌 CRUD Teknisi
+// CRUD Teknisi
 router.post('/', teknisiController.createTeknisi);               // Tambah teknisi
 router.get('/', teknisiController.getAllTeknisi);                // Semua teknisi
 router.get('/:nik', teknisiController.getTeknisiById);           // Detail teknisi by NIK

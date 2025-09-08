@@ -7,7 +7,7 @@ const bcrypt = require('bcrypt');
 
 const app = express();
 
-// 🧾 Logging
+// Logging
 app.use(morgan('dev'));
 
 // 🌐 CORS Configuration
@@ -29,18 +29,18 @@ app.use(cors({
   }
 }));
 
-// 🔐 IP Filtering Middleware
+// IP Filtering Middleware
 const ipFilter = require('./middlewares/ipFilter');
 app.use(ipFilter);
 
-// 🧩 Body Parser Middleware
+// Body Parser Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 🔒 Auth Middleware
+// Auth Middleware
 const authMiddleware = require('./middlewares/authMiddleware');
 
-// 📦 Route Imports
+// Route Imports
 const authRoutes = require('./routes/authRoutes');
 const adminSaRoutes = require('./routes/adminSaRoutes');
 const adminKategoriRoutes = require('./routes/adminKategoriRoutes');
@@ -56,7 +56,7 @@ const bugPhotoRoutes = require('./routes/bugPhotoRoutes');
 
 const supabase = require('./config/supabase');
 
-// 🗃️ Sequelize & Models
+// Sequelize & Models
 const sequelize = require('./config/db');
 const Akun = require('./models/akun');
 require('./models/admin_sa');
@@ -71,7 +71,7 @@ require('./models/bug_assign');
 require('./models/bug_history');
 require('./models/bug_photo');
 
-// 📢 Load Routes
+// Load Routes
 app.use('/auth', authRoutes);
 app.use('/admin-sa', authMiddleware, adminSaRoutes);
 app.use('/admin-kategori', authMiddleware, adminKategoriRoutes);
@@ -89,14 +89,14 @@ console.log('Supabase bucket:', process.env.SUPABASE_BUCKET);
 
 console.log('📦 Semua route berhasil dimuat.');
 
-// ⚙️ Sync Database & Seed Admin SA
+// Sync Database & Seed Admin SA
 sequelize.sync({ alter: true })
   .then(async () => {
     console.log('✅ Database synced');
 
     const AdminSA = require('./models/admin_sa');
 
-    // 🔹 Cek akun
+    // Cek akun
     let admin = await Akun.findOne({ where: { username: process.env.ADMIN_SA_USERNAME } });
     if (!admin) {
       const hashedPassword = await bcrypt.hash(process.env.ADMIN_SA_PASSWORD, 10);

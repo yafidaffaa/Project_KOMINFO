@@ -8,7 +8,7 @@ const roleMiddleware = require('../middlewares/roleMiddleware');
 router.use(authMiddleware);
 router.use(roleMiddleware('admin_sa', 'admin_kategori'));
 
-// 📌 CRUD User Umum
+// CRUD User Umum
 router.post('/', userUmumController.createUserUmum);          // Tambah user umum
 router.get('/', userUmumController.getAllUserUmum);           // Semua user umum
 router.get('/:nik', userUmumController.getUserUmumById);      // Detail user umum

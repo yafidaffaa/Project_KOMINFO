@@ -26,7 +26,7 @@ const Pencatat = sequelize.define('Pencatat', {
   },
   nip_pencatat: {
     type: DataTypes.CHAR(18),
-    allowNull: false  // Wajib karena pegawai pemerintah
+    allowNull: false
   },
   id_akun: {
     type: DataTypes.INTEGER,

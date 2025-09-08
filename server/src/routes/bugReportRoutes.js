@@ -11,7 +11,7 @@ const upload = multer({ storage });
 // Semua route butuh autentikasi
 router.use(authMiddleware);
 
-// 📌 CREATE laporan bug
+// CREATE laporan bug
 router.post(
   '/',
   roleMiddleware('user_umum', 'pencatat', 'admin_sa'),
@@ -19,21 +19,21 @@ router.post(
   bugReportController.createBug
 );
 
-// 📌 GET semua bug (list sesuai role)
+// GET semua bug (list sesuai role)
 router.get(
   '/',
   roleMiddleware('user_umum', 'pencatat', 'validator', 'admin_kategori','admin_sa'),
   bugReportController.getBugs
 );
 
-// 📌 GET detail bug berdasarkan ID
+// GET detail bug berdasarkan ID
 router.get(
   '/:id',
   roleMiddleware('user_umum', 'pencatat', 'validator', 'admin_kategori','admin_sa'),
   bugReportController.getBugById
 );
 
-// 📌 UPDATE bug
+// UPDATE bug
 router.put(
   '/:id',
   roleMiddleware('user_umum', 'pencatat', 'validator', 'admin_kategori', 'admin_sa'),
@@ -41,14 +41,14 @@ router.put(
   bugReportController.updateBug
 );
 
-// 📌 DELETE bug
+// DELETE bug
 router.delete(
   '/:id',
   roleMiddleware('admin_sa'),
   bugReportController.deleteBug
 );
 
-// 📌 GET statistik bug berdasarkan /bug-reports/statistik?tahun=2025
+// GET statistik bug berdasarkan /bug-reports/statistik?tahun=2025
 router.get(
   '/:tahun',
   roleMiddleware('user_umum', 'pencatat', 'validator','admin_sa'),

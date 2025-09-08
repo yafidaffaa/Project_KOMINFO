@@ -6,7 +6,7 @@ const Teknisi = require('./teknisi');
 const Validator = require('./validator');
 
 const BugAssign = sequelize.define('BugAssign', {
-  id_bug_assign: { // disamakan dengan DB
+  id_bug_assign: {
     type: DataTypes.INTEGER,
     autoIncrement: true,
     primaryKey: true

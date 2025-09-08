@@ -166,7 +166,7 @@ const forgotPassword = async (req, res) => {
     const resetToken = jwt.sign(
       { id_akun: user.id_akun, email },
       process.env.JWT_SECRET || 'SECRET_KEY',
-      { expiresIn: '5m' }
+      { expiresIn: '60m' }
     );
 
     // buat transporter (pakai Gmail SMTP)

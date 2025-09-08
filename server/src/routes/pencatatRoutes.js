@@ -8,11 +8,11 @@ const roleMiddleware = require('../middlewares/roleMiddleware');
 router.use(authMiddleware);
 router.use(roleMiddleware('admin_sa','admin_kategori'));
 
-// 📌 CRUD pencatat
-router.post('/', pencatatController.createPencatat);               // ✅ buat pencatat baru
-router.get('/', pencatatController.getAllPencatat);                // ✅ ambil semua pencatat
-router.get('/:nik', pencatatController.getPencatatById);           // ✅ ambil pencatat berdasarkan NIK
-router.put('/:nik', pencatatController.updatePencatat);            // ✅ update data pencatat
-router.delete('/:nik', pencatatController.deletePencatat);         // ✅ hapus pencatat + akun
+// CRUD pencatat
+router.post('/', pencatatController.createPencatat);               // buat pencatat baru
+router.get('/', pencatatController.getAllPencatat);                // ambil semua pencatat
+router.get('/:nik', pencatatController.getPencatatById);           // ambil pencatat berdasarkan NIK
+router.put('/:nik', pencatatController.updatePencatat);            // update data pencatat
+router.delete('/:nik', pencatatController.deletePencatat);         // hapus pencatat + akun
 
 module.exports = router;
