@@ -26,7 +26,7 @@ router.use(authMiddleware);
 
 // GET photos by bug report ID
 router.get('/bug-report/:id_bug_report', 
-  roleMiddleware('user_umum', 'pencatat', 'admin_sa', 'validator', 'teknisi'),
+  roleMiddleware('user_umum', 'pencatat', 'admin_sa', 'validator', 'teknisi', 'admin_kategori'),
   bugPhotoController.getPhotosByBugId
 );
 

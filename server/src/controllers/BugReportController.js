@@ -572,54 +572,73 @@ const deleteBug = async (req, res) => {
   }
 };
 
-// Statistik
+// Statistik Bug Report
 const getBugStatistics = async (req, res) => {
   try {
-    const { tahun } = req.query;
+    let { tahun } = req.query;
     if (!tahun) {
-      return res.status(400).json({ message: 'Parameter tahun wajib diisi ?tahun=YYYY' });
+      tahun = new Date().getFullYear(); // default tahun berjalan
     }
 
-    // filter tahun
-    let whereClause = {
+    // Range awal & akhir tahun
+    const startDate = new Date(`${tahun}-01-01 00:00:00`);
+    const endDate = new Date(`${tahun}-12-31 23:59:59`);
+
+    // Filter dasar - GUNAKAN tanggal_laporan (snake_case)
+    const whereCondition = {
       tanggal_laporan: {
-        [Op.between]: [new Date(`${tahun}-01-01`), new Date(`${tahun}-12-31`)]
-      }
+        [Op.between]: [startDate, endDate],
+      },
     };
 
-    // Filter berdasarkan role
+    // Filter sesuai role
     if (isRole(req.user, 'user_umum')) {
-      whereClause.nik_user = req.user.nik_user;
+      whereCondition.nik_user = req.user.nik_user;
     } else if (isRole(req.user, 'pencatat')) {
-      whereClause.nik_pencatat = req.user.nik_pencatat;
+      whereCondition.nik_pencatat = req.user.nik_pencatat;
     } else if (isRole(req.user, 'validator')) {
       const kategori = await BugCategory.findAll({
         where: { nik_validator: req.user.nik_validator },
         attributes: ['id_kategori']
       });
       const idKategoriList = kategori.map(k => k.id_kategori);
-      whereClause.id_bug_category = { [Op.in]: idKategoriList };
+      whereCondition.id_bug_category = { [Op.in]: idKategoriList };
     } else if (!isRole(req.user, 'admin_sa')) {
       return res.status(403).json({ message: 'Akses ditolak' });
     }
 
-    // Hitung semua statistik
-    const total = await BugReport.count({ where: whereClause });
-    const diajukan = await BugReport.count({ where: { ...whereClause, status: 'diajukan' } });
-    const diproses = await BugReport.count({ where: { ...whereClause, status: 'diproses' } });
-    const selesai = await BugReport.count({ where: { ...whereClause, status: 'selesai' } });
-    const pendapat_selesai = await BugReport.count({ where: { ...whereClause, status: 'pendapat_selesai' } });
+    console.log('📊 Where condition:', whereCondition); // Debug log
+    console.log('🎯 Date range:', { startDate, endDate }); // Debug log
 
-    res.json({
-      tahun,
+    // Hitung semua statistik
+    const total = await BugReport.count({ where: whereCondition });
+    const diajukan = await BugReport.count({ 
+      where: { ...whereCondition, status: 'diajukan' } 
+    });
+    const diproses = await BugReport.count({ 
+      where: { ...whereCondition, status: 'diproses' } 
+    });
+    const selesai = await BugReport.count({ 
+      where: { ...whereCondition, status: 'selesai' } 
+    });
+    const pendapatSelesai = await BugReport.count({ 
+      where: { ...whereCondition, status: 'pendapat_selesai' } 
+    });
+
+    return res.json({
+      tahun: parseInt(tahun),
       total,
       diajukan,
       diproses,
       selesai,
-      pendapat_selesai
+      pendapat_selesai: pendapatSelesai,
     });
-  } catch (err) {
-    res.status(500).json({ message: 'Gagal mengambil statistik bug', error: err.message });
+  } catch (error) {
+    console.error('❌ Error in getBugStatistics:', error);
+    return res.status(500).json({ 
+      message: 'Gagal mengambil statistik bug', 
+      error: error.message 
+    });
   }
 };
 

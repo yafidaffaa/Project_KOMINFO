@@ -4,26 +4,43 @@ const adminSaController = require('../controllers/AdminPusatController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const roleMiddleware = require('../middlewares/roleMiddleware');
 
-// Middleware autentikasi dan role admin pusat (admin_sa)
+// Middleware global → semua endpoint butuh login
 router.use(authMiddleware);
-router.use(roleMiddleware(['admin_sa']));
-// router.use(roleMiddleware('admin_sa', 'admin_kategori'));
 
-router.get('/dashboard-statistic', adminSaController.getStatistikPengguna);
+// Statistik pengguna - admin_sa DAN admin_kategori boleh akses
+router.get('/dashboard-statistic', 
+  roleMiddleware('admin_sa', 'admin_kategori'),
+  adminSaController.getStatistikPengguna
+);
 
-// Monitoring dashboard (statistik umum)
-router.get('/dashboard', adminSaController.getMonitoringData);
+// Monitoring dashboard (statistik umum) - hanya admin_sa
+router.get('/dashboard', 
+  roleMiddleware('admin_sa'),
+  adminSaController.getMonitoringData
+);
 
-// Daftar semua akun di sistem
-router.get('/daftar-akun', adminSaController.getAllUsers);
+// Daftar semua akun di sistem - hanya admin_sa
+router.get('/daftar-akun', 
+  roleMiddleware('admin_sa'),
+  adminSaController.getAllUsers
+);
 
-// Detail user berdasarkan role (admin_sa, pencatat, user_umum, validator, teknisi, admin_kategori)
-router.get('/user/role/:role', adminSaController.getUserDetailByRole);
+// Detail user berdasarkan role - hanya admin_sa
+router.get('/user/role/:role', 
+  roleMiddleware('admin_sa'),
+  adminSaController.getUserDetailByRole
+);
 
-// Menghapus akun berdasarkan id_akun
-router.delete('/user/:id_akun', adminSaController.deleteAkun);
+// Menghapus akun berdasarkan id_akun - hanya admin_sa
+router.delete('/user/:id_akun', 
+  roleMiddleware('admin_sa'),
+  adminSaController.deleteAkun
+);
 
-// Membuat user baru (akun + profil) berdasarkan role
-router.post('/user', adminSaController.createUser);
+// Membuat user baru - hanya admin_sa
+router.post('/user', 
+  roleMiddleware('admin_sa'),
+  adminSaController.createUser
+);
 
 module.exports = router;

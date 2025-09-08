@@ -26,6 +26,13 @@ router.get(
   bugReportController.getBugs
 );
 
+// GET statistik bug berdasarkan /bug-reports/statistik?tahun=2025
+router.get(
+  '/statistik',
+  roleMiddleware('user_umum', 'pencatat', 'validator','admin_sa'),
+  bugReportController.getBugStatistics
+);
+
 // GET detail bug berdasarkan ID
 router.get(
   '/:id',
@@ -47,13 +54,5 @@ router.delete(
   roleMiddleware('admin_sa'),
   bugReportController.deleteBug
 );
-
-// GET statistik bug berdasarkan /bug-reports/statistik?tahun=2025
-router.get(
-  '/:tahun',
-  roleMiddleware('user_umum', 'pencatat', 'validator','admin_sa'),
-  bugReportController.getBugStatistics
-);
-
 
 module.exports = router;

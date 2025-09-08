@@ -11,6 +11,7 @@ const checkBugReportAccess = async (req, bugReport) => {
   const user = req.user;
   
   if (isRole(user, 'admin_sa')) return true;
+  if (isRole(user, 'admin_kategori')) return true;
   if (isRole(user, 'user_umum')) return bugReport.nik_user === user.nik_user;
   if (isRole(user, 'pencatat')) return bugReport.nik_pencatat === user.nik_pencatat;
 

@@ -14,6 +14,13 @@ router.get(
   (req, res) => bugAssignController.getAllAssign(req, res)
 );
 
+// GET statistik bug berdasarkan /bug-reports/statistik?tahun=2025
+router.get(
+  '/statistik',
+  roleMiddleware('teknisi', 'validator','admin_sa'),
+  bugAssignController.getStatistikAssign
+);
+
 // Lihat detail bug assign by ID
 router.get(
   '/:id_bug_assign',
@@ -33,14 +40,6 @@ router.delete(
   '/:id_bug_assign',
   roleMiddleware('admin_sa'),
   (req, res) => bugAssignController.deleteAssign(req, res)
-);
-
-// GET statistik bug berdasarkan /bug-reports/statistik?tahun=2025
-
-router.get(
-  '/:tahun',
-  roleMiddleware('teknisi', 'validator','admin_sa'),
-  bugAssignController.getStatistikAssign
 );
 
 module.exports = router;

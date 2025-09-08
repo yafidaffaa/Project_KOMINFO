@@ -284,9 +284,9 @@ const getStatistikAssign = async (req, res) => {
     const startDate = new Date(`${tahun}-01-01 00:00:00`);
     const endDate = new Date(`${tahun}-12-31 23:59:59`);
 
-    // Filter dasar
+    // Filter dasar - GUNAKAN created_at (snake_case)
     const whereCondition = {
-      createdAt: {
+      created_at: {  // ← Gunakan created_at (snake_case)
         [Op.between]: [startDate, endDate],
       },
     };
@@ -297,6 +297,9 @@ const getStatistikAssign = async (req, res) => {
     } else if (req.user.role === "validator") {
       whereCondition.nik_validator = req.user.nik_validator;
     }
+
+    console.log('📊 Where condition:', whereCondition); // Debug log
+    console.log('🎯 Date range:', { startDate, endDate }); // Debug log
 
     // Hitung jumlah
     const total = await BugAssign.count({ where: whereCondition });
@@ -311,14 +314,14 @@ const getStatistikAssign = async (req, res) => {
     });
 
     return res.json({
-      tahun,
+      tahun: parseInt(tahun),
       total,
       diproses,
       selesai,
       pendapat_selesai: pendapatSelesai,
     });
   } catch (error) {
-    console.error(error);
+    console.error('❌ Error in getStatistikAssign:', error);
     return res.status(500).json({
       message: "Gagal mengambil statistik bug assign",
       error: error.message,
