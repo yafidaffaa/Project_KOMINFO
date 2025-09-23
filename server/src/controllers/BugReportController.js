@@ -8,6 +8,7 @@ const Pencatat = require('../models/pencatat');
 const AdminSA = require('../models/admin_sa');
 const BugAssign = require('../models/bug_assign');
 const { uploadToSupabase, deleteFromSupabase } = require('../utils/supabaseUpload');
+const { generateKeterangan } = require('../utils/bugHistoryHelper');
 const { Op } = require('sequelize');
 
 // Helper untuk cek role
@@ -70,7 +71,7 @@ const createBug = async (req, res) => {
       id_bug_report: bug.id_bug_report,
       id_akun: req.user.id_akun,
       status: 'diajukan', // sesuai enum BugReport
-      keterangan: `Laporan dibuat oleh ${req.user.role}: ${req.user.username}`,
+      keterangan: generateKeterangan('diajukan', req.user),
       tanggal: new Date()
     });
 
@@ -516,12 +517,14 @@ const updateBug = async (req, res) => {
 
     await bug.update(updateData);
 
+    const newStatus = updateData.status || bug.status;
+
     // Catat history
     await BugHistory.create({
       id_bug_report: bug.id_bug_report,
       id_akun: req.user.id_akun,
-      status: updateData.status || bug.status,
-      keterangan: `Bug diperbarui oleh ${req.user.role}: ${req.user.username}`,
+      status: newStatus,
+      keterangan: generateKeterangan(newStatus, req.user),
       tanggal: new Date()
     });
 

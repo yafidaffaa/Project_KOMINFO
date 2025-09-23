@@ -9,6 +9,7 @@ const BugPhoto = require('../models/bug_photo');
 const UserUmum = require('../models/user_umum');
 const Pencatat = require('../models/pencatat');
 const AdminSA = require('../models/admin_sa');
+const { generateKeterangan } = require('../utils/bugHistoryHelper');
 const { Op } = require("sequelize");
 
 // Helper cek role
@@ -170,8 +171,8 @@ const updateAssign = async (req, res) => {
       await BugHistory.create({
         id_bug_report: assign.id_bug_report,
         id_akun: req.user.id_akun,
-        status: `${status}`,
-        keterangan: `Bug assign diperbarui oleh ${req.user.role}: ${req.user.username}`,
+        status: status,
+        keterangan: generateKeterangan(status, req.user),
         tanggal: new Date()
       });
 
@@ -203,7 +204,7 @@ const updateAssign = async (req, res) => {
         id_bug_report: assign.id_bug_report,
         id_akun: req.user.id_akun,
         status: `${validasi_validator}`,
-        keterangan: `Bug assign diperbarui oleh ${req.user.role}: ${req.user.username}`,
+        keterangan: generateKeterangan(validasi_validator, req.user),
         tanggal: new Date()
       });
 
@@ -215,7 +216,7 @@ const updateAssign = async (req, res) => {
         id_bug_report: assign.id_bug_report,
         id_akun: req.user.id_akun,
         status: 'Admin_sa melakukan update bug assign',
-        keterangan: `Bug assign diperbarui oleh ${req.user.role}: ${req.user.username}`,
+        keterangan: generateKeterangan('Admin_sa melakukan update bug assign', req.user),
         tanggal: new Date()
       });
     } else {
@@ -262,7 +263,7 @@ const deleteAssign = async (req, res) => {
       id_bug_report: assign.id_bug_report,
       id_akun: req.user.id_akun,
       status: 'Bug assign dihapus admin_sa',
-      keterangan: `Bug assign dihapus oleh ${req.user.role}: ${req.user.username}`,
+      keterangan: generateKeterangan('Bug assign dihapus admin_sa', req.user),
       tanggal: new Date()
     });
 
