@@ -10,12 +10,19 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@heroicons/react": "^2.2.0",
+    "axios": "^1.10.0",
+    "cors": "^2.8.5",
+    "jwt-decode": "^4.0.0",
+    "link": "^2.1.1",
+    "lucide-react": "^0.524.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
+    "@types/cors": "^2.8.19",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@types/react-router-dom": "^5.3.3",
