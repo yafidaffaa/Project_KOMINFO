@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import axios from "axios";
 import logo from "@/assets/logo.png";
 import heroImage from "@/assets/hero-illustration.png";
 import catatIcon from "@/assets/catat.png";
@@ -7,15 +8,59 @@ import validasiIcon from "@/assets/validasi.png";
 import teknisiIcon from "@/assets/teknisi.png";
 import selesaiIcon from "@/assets/selesai.png";
 
-const Home = () => {
+// Interface untuk aduan
+interface Aduan {
+  id: number;
+  layanan: string;
+  isi: string;
+  status: "Proses" | "Selesai" | "Terkirim" | string;
+  pelapor: string;
+  tanggal: string;
+}
+
+const Home: React.FC = () => {
+  const [daftarAduan, setDaftarAduan] = useState<Aduan[]>([]);
+  const [statistik, setStatistik] = useState({ total: 0, proses: 0, selesai: 0 });
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await axios.get<Aduan[]>("/bug-report"); // Ganti sesuai endpoint backend-mu
+        const data = res.data;
+
+        setDaftarAduan(data.slice(0, 9));
+
+        const total = data.length;
+        const proses = data.filter((d) => d.status === "Proses").length;
+        const selesai = data.filter((d) => d.status === "Selesai").length;
+
+        setStatistik({ total, proses, selesai });
+      } catch (err: unknown) {
+        if (axios.isAxiosError(err)) {
+          setError("Gagal memuat data: " + err.message);
+        } else {
+          setError("Terjadi kesalahan tak terduga");
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
   return (
-    <div className="min-h-screen  bg-homegreen flex flex-col overflow-x-hidden scroll-smooth">
+    <div className="min-h-screen bg-homegreen flex flex-col overflow-x-hidden scroll-smooth">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 md:px-12 py-4  bg-homegreen sticky top-0 z-10">
+      <header className="flex items-center justify-between px-4 md:px-12 py-4 bg-homegreen sticky top-0 z-10">
         <div className="flex items-center gap-2">
           <img src={logo} alt="Logo" className="w-8 md:w-10" />
           <h1 className="text-xs md:text-sm font-semibold leading-tight text-black">
-            DINAS KOMUNIKASI DAN INFORMATIKA<br />PERSANDIAN YOGYAKARTA
+            DINAS KOMUNIKASI DAN INFORMATIKA
+            <br />
+            PERSANDIAN YOGYAKARTA
           </h1>
         </div>
         <nav className="space-x-6 text-black font-medium italic text-sm">
@@ -29,7 +74,9 @@ const Home = () => {
       <section className="flex flex-col md:flex-row items-center justify-between px-6 md:px-12 py-12 md:py-20" id="tentang">
         <div className="md:w-1/2 space-y-6">
           <h2 className="text-3xl md:text-4xl font-semibold italic">
-            Layanan Pengaduan Kendala<br />Aplikasi/Website Pemerintah
+            Layanan Pengaduan Kendala
+            <br />
+            Aplikasi/Website Pemerintah
           </h2>
           <p className="text-gray-700">
             Sampaikan laporan jika anda mengalami masalah saat menggunakan layanan digital pemerintah.
@@ -49,7 +96,7 @@ const Home = () => {
       </section>
 
       {/* Alur */}
-      <section id="alur" className="py-20 px-6 md:px-16 text-center  bg-homegreen">
+      <section id="alur" className="py-20 px-6 md:px-16 text-center bg-gradient-to-b from-homegreen to-primary">
         <h3 className="text-2xl md:text-3xl font-bold mb-12">Alur Penanganan Laporan</h3>
         <div className="flex flex-col md:flex-row justify-between items-start gap-12">
           {[{
@@ -79,7 +126,7 @@ const Home = () => {
       </section>
 
       {/* Search Aduan */}
-      <section className=" bg-homegreen px-6 md:px-20 py-10 text-center">
+      {/* <section className="bg-homegreen px-6 md:px-20 py-10 text-center">
         <h4 className="font-semibold text-xl mb-4">CARI ADUAN ANDA DISINI</h4>
         <div className="flex justify-center gap-4 max-w-xl mx-auto">
           <input
@@ -89,15 +136,15 @@ const Home = () => {
           />
           <button className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-full">CARI</button>
         </div>
-      </section>
+      </section> */}
 
       {/* Statistik */}
-      <section className="bg-white py-8">
+      {/* <section className="bg-white py-8">
         <div className="flex justify-center items-center gap-8 text-center">
           {[
-            { label: "Jumlah Aduan", value: 250 },
-            { label: "Proses", value: 30 },
-            { label: "Selesai", value: 130 },
+            { label: "Jumlah Aduan", value: statistik.total },
+            { label: "Proses", value: statistik.proses },
+            { label: "Selesai", value: statistik.selesai },
           ].map((stat, idx) => (
             <div key={idx} className="border px-6 py-4 rounded-md shadow-md">
               <p className="text-sm font-semibold text-gray-600">{stat.label}</p>
@@ -105,37 +152,44 @@ const Home = () => {
             </div>
           ))}
         </div>
-      </section>
+      </section> */}
 
       {/* Daftar Aduan */}
-      <section id="aduan" className="py-16 px-6 md:px-20 bg-gradient-to-b from-homegreen to-primary">
+      {/* <section id="aduan" className="py-16 px-6 md:px-20 bg-gradient-to-b from-homegreen to-primary">
         <h3 className="text-2xl font-bold mb-6 text-center">Daftar aduan</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {Array.from({ length: 9 }).map((_, i) => (
-            <div key={i} className="bg-white border rounded-md p-4 shadow hover:shadow-lg transition">
-              <div className="flex justify-between items-center mb-2">
-                <span className="font-semibold">JSS</span>
-                <span className="text-xs text-gray-500">Status: Proses</span>
+        {loading ? (
+          <p className="text-center text-sm text-gray-600">Memuat aduan...</p>
+        ) : error ? (
+          <p className="text-center text-sm text-red-500">{error}</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {daftarAduan.map((aduan) => (
+              <div key={aduan.id} className="bg-white border rounded-md p-4 shadow hover:shadow-lg transition">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="font-semibold">{aduan.layanan}</span>
+                  <span className="text-xs text-gray-500">Status: {aduan.status}</span>
+                </div>
+                <p className="text-sm text-gray-700 mb-4">{aduan.isi}</p>
+                <div className="text-xs text-gray-600 flex justify-between">
+                  <span>👤 {aduan.pelapor}</span>
+                  <span>📅 {aduan.tanggal}</span>
+                </div>
               </div>
-              <p className="text-sm text-gray-700 mb-4">
-                Verifikasi struktural gagal dengan keterangan tertentu. Terjadi pada permohonan tertentu.
-              </p>
-              <div className="text-xs text-gray-600 flex justify-between">
-                <span>👤 asep</span>
-                <span>📅 20/07/2025</span>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
         <div className="text-right mt-6">
-          <a href="#" className="text-sm text-blue-600 hover:underline">Lihat lebih banyak &gt;</a>
+          <Link to="/daftaraduan" className="text-sm text-blue-600 hover:underline">
+            Lihat lebih banyak &gt;
+          </Link>
         </div>
-      </section>
+      </section> */}
 
       {/* Footer */}
       <footer id="kontak" className="bg-footer py-6 px-4 md:px-12 text-center text-xs text-gray-800">
         <p>
-          Dinas Komunikasi Informatika dan Persandian © 2025 Pemerintah Kota Yogyakarta<br />
+          Dinas Komunikasi Informatika dan Persandian © 2025 Pemerintah Kota Yogyakarta
+          <br />
           Jl. Kenari No. 56 Yogyakarta Telp. (0274) 515865, 561270 Fax. (0274) 561270 Email:{" "}
           <a href="mailto:kominfosandi@jogjakota.go.id" className="text-blue-700 hover:underline">
             kominfosandi@jogjakota.go.id

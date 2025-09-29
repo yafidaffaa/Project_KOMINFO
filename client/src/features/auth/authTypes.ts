@@ -24,7 +24,7 @@ export type RegisterRequest = {
   username: string;
   password: string;
   nama: string;
+  konfirmasiPassword: string;
   nik_user: string;
-  alamat: string;
   email: string;
 };

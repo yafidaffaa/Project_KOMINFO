@@ -3,15 +3,23 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import lockpass from "@/assets/lockpass.png";
 import InputField from "../components/inputfield";
+import { forgotPassword } from "../services/authService";
 
 const ForgotPassword = () => {
     const [email, setEmail] = useState("");
     const navigate = useNavigate();
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        console.log("Email dikirim:", email);
+        try {
+            const res = await forgotPassword(email);
+            alert(res.message); // pesan dari backend
+            navigate("/"); // misalnya redirect ke login
+        } catch (error: any) {
+            alert(error.response?.data?.message || "Terjadi kesalahan");
+        }
     };
+
 
     return (
         <div className="relative min-h-screen flex items-center justify-center bg-white px-4">
