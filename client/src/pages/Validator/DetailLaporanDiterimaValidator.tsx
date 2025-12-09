@@ -43,18 +43,34 @@ const DetailLaporanDiterimaValidator: React.FC = () => {
     }, [id]);
 
     const handleUpdate = async (valid: boolean) => {
-        if (!id) return;
-        try {
-            await updateLaporanDiterima(id, {
-                ket_validator: keterangan,
-                validasi_validator: valid ? "disetujui" : "tidak_disetujui",
-            });
-            alert(`Perbaikan ${valid ? "diterima" : "ditolak"}!`);
-            navigate(-1);
-        } catch (err) {
-            alert("Gagal memperbarui laporan");
+    if (!id) return;
+    try {
+        await updateLaporanDiterima(id, {
+            ket_validator: keterangan,
+            validasi_validator: valid ? "disetujui" : "tidak_disetujui",
+        });
+
+        alert(`Perbaikan ${valid ? "diterima" : "ditolak"}!`);
+        navigate(-1);
+
+    } catch (err: any) {
+        console.error("❌ Error update laporan:", err);
+
+        const res = err.response?.data;
+
+        // Jika backend kirim errors: {...}
+        if (res?.errors) {
+            const msg = Object.values(res.errors)
+                .flat()
+                .join("\n");
+            alert(msg);
+            return;
         }
-    };
+
+        // Jika backend kirim message: "..."
+        alert(res?.message || "Gagal memperbarui laporan");
+    }
+};
 
     const handleShowPhotos = async () => {
         if (!report) return;

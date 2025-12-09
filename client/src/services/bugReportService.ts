@@ -135,18 +135,20 @@ export const kirimLaporanBug = async (
 
 
 // DELETE bug report by ID
-export const hapusBugReport = async (id: number | string): Promise<boolean> => {
+// src/services/bugReportService.ts
+export const hapusBugReport = async (id: number | string) => {
   try {
     const token = localStorage.getItem("jwtToken");
-    await api.delete(`/bug-report/${id}`, {
+    const { data } = await api.delete(`/bug-report/${id}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    return true;
+    return data; // return response backend (bisa { message: "..." })
   } catch (error) {
     console.error("Gagal menghapus bug report:", error);
-    return false;
+    throw error; // biarkan UI yang catch & baca err.response.data.message
   }
 };
+
 
 // PUT bug report by ID (pakai FormData biar bisa update foto juga)
 export const updateBugReport = async (

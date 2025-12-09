@@ -4,6 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { fetchBugReportById, getBugReportPhotos, updateBugReport, type BugReport } from "../../services/bugReportService";
 import { fetchBugCategories } from "../../services/BugCategoryServices";
+import axios from "axios";
 
 const DetailLaporanAdmin: React.FC = () => {
   const { id } = useParams();
@@ -43,17 +44,30 @@ const DetailLaporanAdmin: React.FC = () => {
   }, [id]);
 
   const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!id || !selectedKategori) return;
-    try {
-      await updateBugReport(id, undefined, Number(selectedKategori));
-      alert("Kategori berhasil diperbarui!");
-      navigate(-1);
-    } catch (err) {
-      console.error("❌ Error update:", err);
-      alert("Gagal update kategori");
+  e.preventDefault();
+  if (!id || !selectedKategori) return;
+
+  try {
+    await updateBugReport(id, undefined, Number(selectedKategori));
+    alert("Kategori berhasil diperbarui!");
+    navigate(-1);
+  } catch (err: unknown) {
+    console.error("❌ Error update:", err);
+
+    let errorMessage = "Gagal update kategori.";
+
+    if (axios.isAxiosError(err)) {
+      errorMessage =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        errorMessage;
     }
-  };
+
+    alert(errorMessage);
+  }
+};
+
 
   if (!laporan) {
     return <p className="text-center mt-10">Memuat detail laporan...</p>;
