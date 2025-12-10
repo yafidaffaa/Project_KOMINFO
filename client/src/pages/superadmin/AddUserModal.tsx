@@ -101,17 +101,24 @@ const AddUserModal: React.FC<Props> = ({ open, role, onClose, onSubmit }) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Cek field kosong
     const missingFields = fields.filter(f => !form[f.name]);
     if (missingFields.length > 0) {
       alert(`Field wajib: ${missingFields.map(f => f.placeholder).join(", ")}`);
       return;
     }
 
-    onSubmit(form as AddUserData);
+    try {
+      await onSubmit(form as AddUserData);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || "Gagal menambahkan user";
+      alert(msg);
+    }
   };
+
 
   const togglePassword = (fieldName: string) => {
     setShowPassword(prev => ({ ...prev, [fieldName]: !prev[fieldName] }));

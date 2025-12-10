@@ -34,21 +34,25 @@ const DetailLaporanDiterima: React.FC = () => {
     fetchDetail();
   }, [id]);
 
-  const handleDelete = async () => {
-    if (!id) return;
-    const konfirmasi = window.confirm(
-      "Apakah Anda yakin ingin menghapus laporan ini?"
-    );
-    if (!konfirmasi) return;
+const handleDelete = async () => {
+  if (!id) return;
 
-    const success = await hapusLaporanDiterima(id);
-    if (success) {
-      alert("Laporan berhasil dihapus.");
-      navigate(-1);
-    } else {
-      alert("Gagal menghapus laporan. Coba lagi.");
-    }
-  };
+  const konfirmasi = window.confirm(
+    "Apakah Anda yakin ingin menghapus laporan ini?"
+  );
+  if (!konfirmasi) return;
+
+  try {
+    const res = await hapusLaporanDiterima(id);
+
+    alert(res?.message || "Laporan berhasil dihapus");
+    navigate(-1);
+  } catch (err: any) {
+    const msg = err.response?.data?.message || "Gagal menghapus laporan";
+    alert(msg);
+  }
+};
+
 
   if (!laporan) {
     return <p className="text-center mt-10">Memuat detail laporan...</p>;

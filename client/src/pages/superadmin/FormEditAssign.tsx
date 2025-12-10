@@ -59,8 +59,21 @@ const FormEditAssign: React.FC = () => {
             }
         } catch (err: unknown) {
             console.error("❌ Error update bug-assign:", err);
+
             if (axios.isAxiosError(err)) {
-                alert(err.response?.data?.message || "Gagal update bug assign");
+                const res = err.response?.data;
+
+                // Jika backend kirim messages array atau detail error
+                if (res?.errors) {
+                    const msgList = Object.values(res.errors)
+                        .flat()
+                        .join("\n");
+                    alert(msgList);
+                    return;
+                }
+
+                const msg = res?.message || "Gagal update bug assign";
+                alert(msg);
             } else {
                 alert("Terjadi kesalahan tak terduga");
             }

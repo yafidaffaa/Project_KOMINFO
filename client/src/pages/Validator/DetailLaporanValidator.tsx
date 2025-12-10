@@ -51,8 +51,13 @@ const DetailLaporanValidator: React.FC = () => {
       alert(res.message || "Laporan berhasil diperbarui");
       navigate(-1);
     } catch (error: any) {
-      alert(error.message || "Gagal memperbarui laporan, coba lagi");
+      const msg =
+        error.response?.data?.message ||
+        error.message ||
+        "Gagal memperbarui laporan, coba lagi";
+      alert(msg);
     }
+
   };
 
   if (!laporan) {
