@@ -57,10 +57,18 @@ const BugReport = sequelize.define('BugReport', {
     defaultValue: 'diajukan'
   },
   photo_bug: {
-  type: DataTypes.ENUM('ada', 'tidak ada'),
-  allowNull: false,
-  defaultValue: 'tidak ada'
-},
+    type: DataTypes.ENUM('ada', 'tidak ada'),
+    allowNull: false,
+    defaultValue: 'tidak ada'
+  },
+  created_by: {
+    type: DataTypes.STRING(100),
+    allowNull: true
+  },
+  updated_by: {
+    type: DataTypes.STRING(100),
+    allowNull: true
+  },
   ket_validator: {
     type: DataTypes.TEXT,
     allowNull: true

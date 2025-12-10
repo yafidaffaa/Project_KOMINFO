@@ -14,7 +14,8 @@ app.use(morgan('dev'));
 const allowedOrigins = [
   `http://${process.env.IP_FE}`,
   `http://${process.env.HOST}:3000`,
-  'http://localhost:3000'
+  'http://localhost:3000',
+  'http://localhost:5173'
 ];
 
 app.use(cors({

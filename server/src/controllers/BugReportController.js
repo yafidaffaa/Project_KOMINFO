@@ -10,105 +10,166 @@ const BugAssign = require('../models/bug_assign');
 const { uploadToSupabase, deleteFromSupabase } = require('../utils/supabaseUpload');
 const { generateKeterangan } = require('../utils/bugHistoryHelper');
 const { Op } = require('sequelize');
+const sequelize = require('../config/db');
 
 // Helper untuk cek role
 const isRole = (user, ...roles) => roles.includes(user.role);
 
-// CREATE
+// Membuat laporan bug baru
 const createBug = async (req, res) => {
+  const { deskripsi, id_bug_category, ket_validator } = req.body;
+
+  // Validasi role
+  if (!isRole(req.user, 'user_umum', 'pencatat', 'admin_sa')) {
+    return res.status(403).json({ message: 'Akses ditolak' });
+  }
+
+  // Validasi field wajib
+  if (!deskripsi || !id_bug_category) {
+    return res.status(400).json({ message: 'Deskripsi dan kategori bug wajib diisi' });
+  }
+
+  // Validasi panjang deskripsi
+  if (deskripsi.trim().length < 10) {
+    return res.status(400).json({ message: 'Deskripsi minimal 10 karakter' });
+  }
+
+  const transaction = await sequelize.transaction();
+
   try {
-    const { deskripsi, id_bug_category, ket_validator } = req.body;
-
-    if (!isRole(req.user, 'user_umum', 'pencatat', 'admin_sa')) {
-      return res.status(403).json({ message: 'Akses ditolak' });
-    }
-
     // Validasi kategori bug
     const category = await BugCategory.findByPk(id_bug_category);
     if (!category) {
+      await transaction.rollback();
       return res.status(404).json({ message: 'Kategori bug tidak ditemukan' });
     }
 
+    // Validasi foto (jika ada)
+    const photoFiles = req.files || [];
+    if (photoFiles.length > 5) {
+      await transaction.rollback();
+      return res.status(400).json({ message: 'Maksimal 5 foto diperbolehkan' });
+    }
+
+    const createdBy = req.user.nama || req.user.nama_lengkap || 'Unknown';
+
     // Buat bug report dengan photo_bug default 'tidak ada'
     const bug = await BugReport.create({
-      deskripsi,
+      deskripsi: deskripsi.trim(),
       id_bug_category,
       tanggal_laporan: new Date(),
       status: 'diajukan',
       nik_user: req.user.nik_user || null,
       nik_pencatat: req.user.nik_pencatat || null,
       nik_admin_sa: req.user.nik_admin_sa || null,
-      photo_bug: 'tidak ada', // Default
-      ket_validator: ket_validator || null
-    });
+      photo_bug: 'tidak ada',
+      ket_validator: ket_validator?.trim() || null,
+      created_by: createdBy
+    }, { transaction });
 
     // Handle multiple photos
-    const photoFiles = req.files || [];
     if (photoFiles.length > 0) {
-      if (photoFiles.length > 5) {
-        await bug.destroy(); // Rollback
-        return res.status(400).json({ message: 'Maksimal 5 foto diperbolehkan' });
-      }
+      const uploadedPhotos = [];
 
-      for (let i = 0; i < photoFiles.length; i++) {
-        const file = photoFiles[i];
-        const photoUrl = await uploadToSupabase(file.buffer, file.originalname);
-        
-        await BugPhoto.create({
-          id_bug_report: bug.id_bug_report,
-          photo_url: photoUrl,
-          photo_name: file.originalname,
-          urutan: i + 1
-        });
-      }
+      try {
+        for (let i = 0; i < photoFiles.length; i++) {
+          const file = photoFiles[i];
 
-      // Update status photo_bug
-      await bug.update({ photo_bug: 'ada' });
+          // Validasi tipe file
+          const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+          if (!allowedTypes.includes(file.mimetype)) {
+            throw new Error(`File ${file.originalname} bukan format gambar yang valid`);
+          }
+
+          // Validasi ukuran file (max 5MB)
+          if (file.size > 5 * 1024 * 1024) {
+            throw new Error(`File ${file.originalname} melebihi ukuran maksimal 5MB`);
+          }
+
+          const photoUrl = await uploadToSupabase(file.buffer, file.originalname);
+          uploadedPhotos.push(photoUrl);
+
+          await BugPhoto.create({
+            id_bug_report: bug.id_bug_report,
+            photo_url: photoUrl,
+            photo_name: file.originalname,
+            urutan: i + 1
+          }, { transaction });
+        }
+
+        // Update status photo_bug
+        await bug.update({ photo_bug: 'ada' }, { transaction });
+      } catch (uploadError) {
+        // Rollback uploaded photos jika ada error
+        for (const photoUrl of uploadedPhotos) {
+          await deleteFromSupabase(photoUrl);
+        }
+        throw uploadError;
+      }
     }
 
     // Catat history
     await BugHistory.create({
       id_bug_report: bug.id_bug_report,
       id_akun: req.user.id_akun,
-      status: 'diajukan', // sesuai enum BugReport
+      status: 'diajukan',
       keterangan: generateKeterangan('diajukan', req.user),
       tanggal: new Date()
+    }, { transaction });
+
+    await transaction.commit();
+
+    // Ambil data lengkap dengan relasi
+    const newBug = await BugReport.findByPk(bug.id_bug_report, {
+      include: [
+        {
+          model: BugCategory,
+          attributes: ['id_kategori', 'nama_layanan']
+        }
+      ]
     });
 
-    res.status(201).json({ 
-      message: 'Laporan bug berhasil dibuat', 
-      bug: {
-        id_bug_report: bug.id_bug_report,
-        deskripsi: bug.deskripsi,
-        id_bug_category: bug.id_bug_category,
-        tanggal_laporan: bug.tanggal_laporan,
-        status: bug.status,
-        nik_user: bug.nik_user,
-        nik_pencatat: bug.nik_pencatat,
-        ket_validator: bug.ket_validator,
-        photo_bug: bug.photo_bug // FIXED: ganti has_photo dengan photo_bug langsung
-      }
+    res.status(201).json({
+      message: 'Laporan bug berhasil dibuat',
+      data: newBug
     });
-  } catch (err) {
-    res.status(500).json({ message: 'Gagal membuat laporan bug', error: err.message });
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Error create bug report:', error);
+    res.status(500).json({
+      message: 'Terjadi kesalahan saat membuat laporan bug',
+      error: error.message
+    });
   }
 };
 
-// ENHANCED: READ List dengan informasi photo endpoint yang lebih logis
+// Mengambil semua laporan bug
 const getBugs = async (req, res) => {
   try {
     let whereClause = {};
 
+    // Filter berdasarkan role
     if (isRole(req.user, 'user_umum')) {
       whereClause.nik_user = req.user.nik_user;
     } else if (isRole(req.user, 'pencatat')) {
       whereClause.nik_pencatat = req.user.nik_pencatat;
     } else if (isRole(req.user, 'validator')) {
       const kategori = await BugCategory.findAll({
-        where: { nik_validator: req.user.nik_validator }
+        where: { nik_validator: req.user.nik_validator },
+        attributes: ['id_kategori']
       });
+
+      if (kategori.length === 0) {
+        return res.status(200).json({
+          message: 'Belum ada kategori yang ditangani',
+          data: []
+        });
+      }
+
       const idKategoriList = kategori.map(k => k.id_kategori);
       whereClause.id_bug_category = { [Op.in]: idKategoriList };
+    } else if (!isRole(req.user, 'admin_sa', 'admin_kategori')) {
+      return res.status(403).json({ message: 'Akses ditolak' });
     }
 
     const bugs = await BugReport.findAll({
@@ -120,39 +181,48 @@ const getBugs = async (req, res) => {
         },
         {
           model: UserUmum,
-          attributes: ['nik_user', 'nama']
+          attributes: ['nik_user', 'nama'],
+          required: false
         },
         {
           model: Pencatat,
-          attributes: ['nik_pencatat', 'nama']
+          attributes: ['nik_pencatat', 'nama'],
+          required: false
         },
         {
           model: AdminSA,
-          attributes: ['nik_admin_sa', 'nama']
+          attributes: ['nik_admin_sa', 'nama'],
+          required: false
         }
       ],
       order: [['tanggal_laporan', 'DESC']]
     });
 
+    if (bugs.length === 0) {
+      return res.status(200).json({
+        message: 'Belum ada laporan bug',
+        data: []
+      });
+    }
+
+    // Transform data dengan photo info
     const transformedBugs = await Promise.all(bugs.map(async (bug) => {
       const bugJson = bug.toJSON();
-      const nama_pelapor = bug.UserUmum?.nama || bug.Pencatat?.nama || bug.AdminSA?.nama || null;
-      
-      // IMPROVED: Photo endpoint hanya ada jika memang ada foto
+      const nama_pelapor = bug.UserUmum?.nama || bug.Pencatat?.nama || bug.AdminSA?.nama || 'Tidak Diketahui';
+
       let photoInfo = {
         has_photo: bugJson.photo_bug === 'ada',
         photo_count: 0,
-        photo_endpoint: null, // Default null
+        photo_endpoint: null,
         can_view_photos: false
       };
 
-      // Hanya set endpoint dan hitung foto jika memang ada foto
+      // Jika ada foto, ambil detail foto
       if (bugJson.photo_bug === 'ada') {
         const photoCount = await BugPhoto.count({
           where: { id_bug_report: bug.id_bug_report }
         });
 
-        // Hanya set endpoint jika benar-benar ada foto di database
         if (photoCount > 0) {
           photoInfo = {
             has_photo: true,
@@ -161,8 +231,7 @@ const getBugs = async (req, res) => {
             can_view_photos: true
           };
         } else {
-          // Ada inconsistency: photo_bug = 'ada' tapi tidak ada foto di BugPhoto table
-          // Reset photo_bug ke 'tidak ada'
+          // Inconsistency: reset photo_bug ke 'tidak ada'
           await bug.update({ photo_bug: 'tidak ada' });
           photoInfo.has_photo = false;
         }
@@ -175,58 +244,89 @@ const getBugs = async (req, res) => {
       };
     }));
 
-    res.json(transformedBugs);
-  } catch (err) {
-    res.status(500).json({ message: 'Gagal mengambil data laporan', error: err.message });
+    res.status(200).json({
+      message: 'Data laporan bug berhasil diambil',
+      total: transformedBugs.length,
+      data: transformedBugs
+    });
+  } catch (error) {
+    console.error('Error get all bug reports:', error);
+    res.status(500).json({
+      message: 'Terjadi kesalahan saat mengambil data laporan bug',
+      error: error.message
+    });
   }
 };
 
-// ENHANCED: READ Detail dengan logika photo endpoint yang benar
+// Mengambil detail laporan bug berdasarkan ID
 const getBugById = async (req, res) => {
+  const { id } = req.params;
+
+  // Validasi ID
+  if (!id || isNaN(id)) {
+    return res.status(400).json({ message: 'ID bug report tidak valid' });
+  }
+
   try {
-    const bug = await BugReport.findByPk(req.params.id, {
+    const bug = await BugReport.findByPk(id, {
       include: [
         {
           model: BugCategory,
           attributes: ['id_kategori', 'nama_layanan']
         },
-        { model: UserUmum, attributes: ['nik_user', 'nama'] },
-        { model: Pencatat, attributes: ['nik_pencatat', 'nama'] },
-        { model: AdminSA, attributes: ['nik_admin_sa', 'nama'] }
+        {
+          model: UserUmum,
+          attributes: ['nik_user', 'nama'],
+          required: false
+        },
+        {
+          model: Pencatat,
+          attributes: ['nik_pencatat', 'nama'],
+          required: false
+        },
+        {
+          model: AdminSA,
+          attributes: ['nik_admin_sa', 'nama'],
+          required: false
+        }
       ]
     });
 
-    if (!bug) return res.status(404).json({ message: 'Bug tidak ditemukan' });
+    if (!bug) {
+      return res.status(404).json({ message: 'Bug report tidak ditemukan' });
+    }
 
     // Authorization checks
     if (isRole(req.user, 'user_umum') && bug.nik_user !== req.user.nik_user) {
       return res.status(403).json({ message: 'Akses ditolak' });
     }
+
     if (isRole(req.user, 'pencatat') && bug.nik_pencatat !== req.user.nik_pencatat) {
       return res.status(403).json({ message: 'Akses ditolak' });
     }
+
     if (isRole(req.user, 'validator')) {
       const kategori = await BugCategory.findByPk(bug.id_bug_category);
-      if (kategori.nik_validator !== req.user.nik_validator) {
+      if (!kategori || kategori.nik_validator !== req.user.nik_validator) {
         return res.status(403).json({ message: 'Akses ditolak' });
       }
     }
 
     const bugJson = bug.toJSON();
-    const nama_pelapor = bug.UserUmum?.nama || bug.Pencatat?.nama || bug.AdminSA?.nama || null;
+    const nama_pelapor = bug.UserUmum?.nama || bug.Pencatat?.nama || bug.AdminSA?.nama || 'Tidak Diketahui';
 
-    // IMPROVED: Photo info dengan logika yang lebih konsisten
+    // Photo info dengan permission
     let photoInfo = {
       has_photo: bugJson.photo_bug === 'ada',
       photo_count: 0,
-      photo_endpoint: null, // Default null
+      photo_endpoint: null,
       can_view_photos: false,
       can_upload_photos: false,
       can_delete_photos: false,
-      upload_endpoint: null // Endpoint khusus untuk upload (via update)
+      upload_endpoint: null
     };
 
-    // Check permission untuk upload/delete foto terlebih dahulu
+    // Check permission untuk manage photos
     const user = req.user;
     let canManagePhotos = false;
 
@@ -248,8 +348,6 @@ const getBugById = async (req, res) => {
         photoInfo.photo_count = photoCount;
         photoInfo.photo_endpoint = `/bug-photos/bug-report/${bug.id_bug_report}`;
         photoInfo.can_view_photos = true;
-        
-        // Hanya bisa delete jika punya permission dan ada foto
         photoInfo.can_delete_photos = canManagePhotos;
       } else {
         // Inconsistency: reset photo_bug
@@ -258,179 +356,268 @@ const getBugById = async (req, res) => {
       }
     }
 
-    // Upload permission - bisa upload foto baru via update endpoint jika:
-    // 1. Punya permission untuk manage photos
-    // 2. Bug masih dalam status yang bisa diedit (tergantung role)
+    // Upload permission
     if (canManagePhotos) {
       let canUpload = false;
-      
+
       if (isRole(user, 'admin_sa')) {
-        canUpload = true; // Admin bisa upload kapan saja
+        canUpload = true;
       } else if (bugJson.status === 'diajukan') {
-        canUpload = true; // User/pencatat bisa upload jika status masih diajukan
+        canUpload = true;
       }
-      
+
       if (canUpload) {
         photoInfo.can_upload_photos = true;
-        photoInfo.upload_endpoint = `/bug-reports/${bug.id_bug_report}`;
+        photoInfo.upload_endpoint = `/bug-photos/bug-report/${bug.id_bug_report}`;
       }
     }
 
-    const response = {
-      ...bugJson,
-      nama_pelapor,
-      photo_info: photoInfo
-    };
-
-    res.json(response);
-  } catch (err) {
-    res.status(500).json({ message: 'Gagal mengambil detail bug', error: err.message });
+    res.status(200).json({
+      message: 'Detail bug report berhasil diambil',
+      data: {
+        ...bugJson,
+        nama_pelapor,
+        photo_info: photoInfo
+      }
+    });
+  } catch (error) {
+    console.error('Error get bug report by id:', error);
+    res.status(500).json({
+      message: 'Terjadi kesalahan saat mengambil detail bug report',
+      error: error.message
+    });
   }
 };
 
-// UPDATE dengan validasi duplikasi BugAssign yang lebih komprehensif
+// Memperbarui laporan bug
 const updateBug = async (req, res) => {
+  const { id } = req.params;
+
+  // Validasi ID
+  if (!id || isNaN(id)) {
+    return res.status(400).json({ message: 'ID bug report tidak valid' });
+  }
+
+  const transaction = await sequelize.transaction();
+
   try {
-    // ambil bug report + join nama pelapor
-    const bug = await BugReport.findByPk(req.params.id, {
+    const bug = await BugReport.findByPk(id, {
       include: [
         { model: UserUmum, attributes: ['nama'] },
         { model: Pencatat, attributes: ['nama'] },
         { model: AdminSA, attributes: ['nama'] }
-      ]
+      ],
+      transaction
     });
-    
-    if (!bug) return res.status(404).json({ message: 'Bug tidak ditemukan' });
+
+    if (!bug) {
+      await transaction.rollback();
+      return res.status(404).json({ message: 'Bug report tidak ditemukan' });
+    }
 
     let updateData = {};
+    let statusChanged = false;
 
+    const updatedBy = req.user.nama || req.user.nama_lengkap || 'Unknown';
+
+    // ADMIN SA - Full control
     if (isRole(req.user, 'admin_sa')) {
       const { deskripsi, id_bug_category, status, ket_validator } = req.body;
+
+      // Validasi kategori jika diubah
+      if (id_bug_category && id_bug_category !== bug.id_bug_category) {
+        const category = await BugCategory.findByPk(id_bug_category);
+        if (!category) {
+          await transaction.rollback();
+          return res.status(404).json({ message: 'Kategori bug tidak ditemukan' });
+        }
+      }
+
+      // Validasi status jika diubah
+      if (status) {
+        const validStatus = ['diajukan', 'diproses', 'revisi_by_admin', 'selesai', 'pendapat_selesai'];
+        if (!validStatus.includes(status)) {
+          await transaction.rollback();
+          return res.status(400).json({
+            message: 'Status tidak valid',
+            valid_status: validStatus
+          });
+        }
+        statusChanged = status !== bug.status;
+      }
+
       updateData = {
-        deskripsi: deskripsi || bug.deskripsi,
+        deskripsi: deskripsi?.trim() || bug.deskripsi,
         id_bug_category: id_bug_category || bug.id_bug_category,
         status: status || bug.status,
-        ket_validator: ket_validator || bug.ket_validator
+        ket_validator: ket_validator?.trim() || bug.ket_validator,
+        updated_by: updatedBy
       };
 
       // Handle foto untuk admin_sa
       const photoFiles = req.files || [];
       if (photoFiles.length > 0) {
         if (photoFiles.length > 5) {
+          await transaction.rollback();
           return res.status(400).json({ message: 'Maksimal 5 foto diperbolehkan' });
         }
 
-        // Hapus foto lama jika ada
+        // Hapus foto lama
         const existingPhotos = await BugPhoto.findAll({
-          where: { id_bug_report: bug.id_bug_report }
+          where: { id_bug_report: bug.id_bug_report },
+          transaction
         });
-        
+
         for (const photo of existingPhotos) {
           await deleteFromSupabase(photo.photo_url);
-          await photo.destroy();
+          await photo.destroy({ transaction });
         }
 
         // Upload foto baru
-        for (let i = 0; i < photoFiles.length; i++) {
-          const file = photoFiles[i];
-          const photoUrl = await uploadToSupabase(file.buffer, file.originalname);
-          
-          await BugPhoto.create({
-            id_bug_report: bug.id_bug_report,
-            photo_url: photoUrl,
-            photo_name: file.originalname,
-            urutan: i + 1
-          });
+        const uploadedPhotos = [];
+        try {
+          for (let i = 0; i < photoFiles.length; i++) {
+            const file = photoFiles[i];
+
+            // Validasi tipe file
+            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+            if (!allowedTypes.includes(file.mimetype)) {
+              throw new Error(`File ${file.originalname} bukan format gambar yang valid`);
+            }
+
+            // Validasi ukuran file
+            if (file.size > 5 * 1024 * 1024) {
+              throw new Error(`File ${file.originalname} melebihi ukuran maksimal 5MB`);
+            }
+
+            const photoUrl = await uploadToSupabase(file.buffer, file.originalname);
+            uploadedPhotos.push(photoUrl);
+
+            await BugPhoto.create({
+              id_bug_report: bug.id_bug_report,
+              photo_url: photoUrl,
+              photo_name: file.originalname,
+              urutan: i + 1
+            }, { transaction });
+          }
+          updateData.photo_bug = 'ada';
+        } catch (uploadError) {
+          // Rollback uploaded photos
+          for (const photoUrl of uploadedPhotos) {
+            await deleteFromSupabase(photoUrl);
+          }
+          throw uploadError;
         }
-
-        updateData.photo_bug = 'ada';
       }
 
-    } else if (isRole(req.user, 'admin_kategori')) {
+    }
+    // ADMIN KATEGORI
+    else if (isRole(req.user, 'admin_kategori')) {
       if (bug.status !== 'revisi_by_admin') {
-        return res.status(403).json({ message: 'Bug hanya bisa diupdate ketika status revisi_by_admin' });
+        await transaction.rollback();
+        return res.status(403).json({
+          message: 'Bug hanya bisa diupdate ketika status revisi_by_admin'
+        });
       }
 
-      updateData.id_bug_category = req.body.id_bug_category || bug.id_bug_category;
-      updateData.status = 'diajukan'; // otomatis jadi diajukan setelah diperbaiki
+      const { id_bug_category } = req.body;
 
-    } else if (isRole(req.user, 'validator')) {
+      if (id_bug_category) {
+        const category = await BugCategory.findByPk(id_bug_category);
+        if (!category) {
+          await transaction.rollback();
+          return res.status(404).json({ message: 'Kategori bug tidak ditemukan' });
+        }
+      }
+
+      updateData.id_bug_category = id_bug_category || bug.id_bug_category;
+      updateData.status = 'diajukan';
+      updateData.updated_by = updatedBy;
+      statusChanged = true;
+
+    }
+    // VALIDATOR
+    else if (isRole(req.user, 'validator')) {
       if (bug.status === 'revisi_by_admin') {
-        return res.status(403).json({ message: 'Bug masih dalam status revisi_by_admin, tunggu admin kategori memperbarui' });
+        await transaction.rollback();
+        return res.status(403).json({
+          message: 'Bug masih dalam status revisi_by_admin, tunggu admin kategori memperbarui'
+        });
       }
-      
+
       const kategori = await BugCategory.findByPk(bug.id_bug_category);
-      if (kategori.nik_validator !== req.user.nik_validator) {
+      if (!kategori || kategori.nik_validator !== req.user.nik_validator) {
+        await transaction.rollback();
         return res.status(403).json({ message: 'Akses ditolak' });
       }
-      
+
+      const { status, ket_validator } = req.body;
+
+      // Validasi status
+      if (status) {
+        const validStatus = ['diajukan', 'diproses', 'revisi_by_admin', 'selesai', 'pendapat_selesai'];
+        if (!validStatus.includes(status)) {
+          await transaction.rollback();
+          return res.status(400).json({
+            message: 'Status tidak valid',
+            valid_status: validStatus
+          });
+        }
+        statusChanged = status !== bug.status;
+      }
+
       updateData = {
-        status: req.body.status || bug.status,
-        ket_validator: req.body.ket_validator || bug.ket_validator
+        status: status || bug.status,
+        ket_validator: ket_validator?.trim() || bug.ket_validator,
+        updated_by: updatedBy
       };
 
-      // IMPROVED: Validasi BugAssign untuk semua kasus status 'diproses'
-      if (req.body.status === 'diproses') {
-        
-        // VALIDASI 1: Cek apakah sudah ada BugAssign untuk bug report ini
+      // Validasi dan create BugAssign untuk status 'diproses'
+      if (status === 'diproses') {
+        // Cek apakah sudah ada BugAssign
         const existingAssign = await BugAssign.findOne({
-          where: { id_bug_report: bug.id_bug_report }
+          where: { id_bug_report: bug.id_bug_report },
+          transaction
         });
 
         if (existingAssign) {
-          // Jika status sebelumnya sudah 'diproses' dan mau diubah ke 'diproses' lagi
+          await transaction.rollback();
+
           if (bug.status === 'diproses') {
-            return res.status(409).json({ 
+            return res.status(409).json({
               message: 'Bug report sudah dalam status diproses',
-              detail: `Bug assign dengan ID ${existingAssign.id_bug_assign} sudah dibuat sebelumnya. Status tidak dapat diubah ke 'diproses' lagi.`,
-              existing_assign_id: existingAssign.id_bug_assign,
-              current_status: bug.status,
-              requested_status: req.body.status
+              detail: `Bug assign dengan ID ${existingAssign.id_bug_assign} sudah dibuat sebelumnya`,
+              existing_assign_id: existingAssign.id_bug_assign
             });
           } else {
-            // Jika status sebelumnya bukan 'diproses' tapi sudah ada BugAssign
-            return res.status(409).json({ 
+            return res.status(409).json({
               message: 'Bug assign sudah ada untuk laporan ini',
               detail: `Bug assign dengan ID ${existingAssign.id_bug_assign} sudah dibuat sebelumnya`,
-              existing_assign_id: existingAssign.id_bug_assign,
-              current_status: bug.status,
-              requested_status: req.body.status
+              existing_assign_id: existingAssign.id_bug_assign
             });
           }
         }
 
-        // VALIDASI 2: Ambil teknisi dan pastikan ada
+        // Ambil teknisi
         const teknisis = await Teknisi.findAll({
-          where: { nik_validator: req.user.nik_validator }
+          where: { nik_validator: req.user.nik_validator },
+          transaction
         });
 
         if (teknisis.length === 0) {
-          return res.status(400).json({ 
+          await transaction.rollback();
+          return res.status(400).json({
             message: 'Tidak ada teknisi untuk validator ini',
-            detail: 'Tidak dapat mengubah status ke diproses karena tidak ada teknisi yang terdaftar untuk validator ini'
+            detail: 'Tidak dapat mengubah status ke diproses karena tidak ada teknisi yang terdaftar'
           });
         }
 
-        // VALIDASI 3: Double check - cek lagi apakah ada yang concurrent create
-        const doubleCheckAssign = await BugAssign.findOne({
-          where: { id_bug_report: bug.id_bug_report }
-        });
+        // Buat BugAssign
+        const namaPelapor = bug.UserUmum?.nama || bug.Pencatat?.nama || bug.AdminSA?.nama || 'Tidak Diketahui';
+        const createdBy = req.user.nama || req.user.nama_lengkap || 'Unknown';
 
-        if (doubleCheckAssign) {
-          return res.status(409).json({ 
-            message: 'Bug assign sudah dibuat oleh proses lain',
-            detail: 'Terjadi concurrent creation, silakan refresh dan cek kembali',
-            existing_assign_id: doubleCheckAssign.id_bug_assign
-          });
-        }
-
-        // Jika semua validasi passed, buat BugAssign
-        const namaPelapor = bug.UserUmum?.nama || bug.Pencatat?.nama || bug.AdminSA?.nama || null;
-
-        // Buat penugasan untuk setiap teknisi
-        const createdAssigns = [];
         for (const t of teknisis) {
-          const newAssign = await BugAssign.create({
+          await BugAssign.create({
             id_bug_category: bug.id_bug_category,
             deskripsi: bug.deskripsi,
             photo_bug: bug.photo_bug,
@@ -442,148 +629,231 @@ const updateBug = async (req, res) => {
             validasi_validator: null,
             catatan_teknisi: null,
             nik_teknisi: t.nik_teknisi,
-            nik_validator: req.user.nik_validator
-          });
-          createdAssigns.push(newAssign.id_bug_assign);
-        }
-
-        // Log untuk tracking
-        console.log(`BugAssign created for bug ${bug.id_bug_report}:`, createdAssigns);
-      }
-
-      // ADDITIONAL: Validasi untuk kasus lain jika perlu memberikan info
-      else if (bug.status === 'diproses' && req.body.status && req.body.status !== 'diproses') {
-        // Jika status sekarang 'diproses' dan mau diubah ke status lain, cek apakah ada BugAssign
-        const existingAssign = await BugAssign.findOne({
-          where: { id_bug_report: bug.id_bug_report }
-        });
-
-        if (existingAssign) {
-          // Ini informational saja, tidak block update
-          console.log(`Info: Bug report ${bug.id_bug_report} memiliki BugAssign ${existingAssign.id_bug_assign}, status akan diubah dari ${bug.status} ke ${req.body.status}`);
+            nik_validator: req.user.nik_validator,
+            created_by: createdBy,
+            updated_by: createdBy
+          }, { transaction });
         }
       }
 
-    } else if (isRole(req.user, 'user_umum', 'pencatat')) {
+    }
+    // USER UMUM / PENCATAT
+    else if (isRole(req.user, 'user_umum', 'pencatat')) {
       if (bug.status !== 'diajukan') {
+        await transaction.rollback();
         return res.status(403).json({ message: 'Bug sudah tidak dapat diubah' });
       }
-      
+
+      // Authorization check
       if (isRole(req.user, 'user_umum') && bug.nik_user !== req.user.nik_user) {
+        await transaction.rollback();
         return res.status(403).json({ message: 'Akses ditolak' });
       }
       if (isRole(req.user, 'pencatat') && bug.nik_pencatat !== req.user.nik_pencatat) {
+        await transaction.rollback();
         return res.status(403).json({ message: 'Akses ditolak' });
       }
 
-      updateData.deskripsi = req.body.deskripsi || bug.deskripsi;
-      
-      // Handle foto untuk user_umum/pencatat
+      const { deskripsi } = req.body;
+
+      // Validasi deskripsi
+      if (deskripsi && deskripsi.trim().length < 10) {
+        await transaction.rollback();
+        return res.status(400).json({ message: 'Deskripsi minimal 10 karakter' });
+      }
+
+      updateData.deskripsi = deskripsi?.trim() || bug.deskripsi;
+      updateData.updated_by = updatedBy;
+
+      // Handle foto
       const photoFiles = req.files || [];
       if (photoFiles.length > 0) {
         if (photoFiles.length > 5) {
+          await transaction.rollback();
           return res.status(400).json({ message: 'Maksimal 5 foto diperbolehkan' });
         }
 
-        // Hapus foto lama jika ada
+        // Hapus foto lama
         const existingPhotos = await BugPhoto.findAll({
-          where: { id_bug_report: bug.id_bug_report }
+          where: { id_bug_report: bug.id_bug_report },
+          transaction
         });
-        
+
         for (const photo of existingPhotos) {
           await deleteFromSupabase(photo.photo_url);
-          await photo.destroy();
+          await photo.destroy({ transaction });
         }
 
         // Upload foto baru
-        for (let i = 0; i < photoFiles.length; i++) {
-          const file = photoFiles[i];
-          const photoUrl = await uploadToSupabase(file.buffer, file.originalname);
-          
-          await BugPhoto.create({
-            id_bug_report: bug.id_bug_report,
-            photo_url: photoUrl,
-            photo_name: file.originalname,
-            urutan: i + 1
-          });
-        }
+        const uploadedPhotos = [];
+        try {
+          for (let i = 0; i < photoFiles.length; i++) {
+            const file = photoFiles[i];
 
-        updateData.photo_bug = 'ada';
+            // Validasi tipe file
+            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+            if (!allowedTypes.includes(file.mimetype)) {
+              throw new Error(`File ${file.originalname} bukan format gambar yang valid`);
+            }
+
+            // Validasi ukuran file
+            if (file.size > 5 * 1024 * 1024) {
+              throw new Error(`File ${file.originalname} melebihi ukuran maksimal 5MB`);
+            }
+
+            const photoUrl = await uploadToSupabase(file.buffer, file.originalname);
+            uploadedPhotos.push(photoUrl);
+
+            await BugPhoto.create({
+              id_bug_report: bug.id_bug_report,
+              photo_url: photoUrl,
+              photo_name: file.originalname,
+              urutan: i + 1
+            }, { transaction });
+          }
+          updateData.photo_bug = 'ada';
+        } catch (uploadError) {
+          // Rollback uploaded photos
+          for (const photoUrl of uploadedPhotos) {
+            await deleteFromSupabase(photoUrl);
+          }
+          throw uploadError;
+        }
       }
 
     } else {
+      await transaction.rollback();
       return res.status(403).json({ message: 'Akses ditolak' });
     }
 
-    await bug.update(updateData);
+    // Cek apakah ada perubahan
+    const hasChanges = Object.keys(updateData).some(
+      key => updateData[key] !== bug[key]
+    );
+
+    if (!hasChanges) {
+      await transaction.rollback();
+      return res.status(400).json({ message: 'Tidak ada data yang diperbarui' });
+    }
+
+    // Update bug report
+    await bug.update(updateData, { transaction });
 
     const newStatus = updateData.status || bug.status;
 
-    // Catat history
-    await BugHistory.create({
-      id_bug_report: bug.id_bug_report,
-      id_akun: req.user.id_akun,
-      status: newStatus,
-      keterangan: generateKeterangan(newStatus, req.user),
-      tanggal: new Date()
+    // Catat history jika status berubah
+    if (statusChanged) {
+      await BugHistory.create({
+        id_bug_report: bug.id_bug_report,
+        id_akun: req.user.id_akun,
+        status: newStatus,
+        keterangan: generateKeterangan(newStatus, req.user),
+        tanggal: new Date()
+      }, { transaction });
+    }
+
+    await transaction.commit();
+
+    // Ambil data lengkap
+    const updatedBug = await BugReport.findByPk(bug.id_bug_report, {
+      include: [
+        {
+          model: BugCategory,
+          attributes: ['id_kategori', 'nama_layanan']
+        }
+      ]
     });
 
-    const response = {
-      ...bug.toJSON(),
-      ...updateData
-    };
-
-    res.json({ message: 'Bug diperbarui', bug: response });
-  } catch (err) {
-    console.error('Error updating bug:', err);
-    res.status(500).json({ message: 'Gagal memperbarui bug', error: err.message });
+    res.status(200).json({
+      message: 'Bug report berhasil diperbarui',
+      data: updatedBug
+    });
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Error update bug report:', error);
+    res.status(500).json({
+      message: 'Terjadi kesalahan saat memperbarui bug report',
+      error: error.message
+    });
   }
 };
 
-// DELETE
+// Menghapus laporan bug
 const deleteBug = async (req, res) => {
+  const { id } = req.params;
+
+  // Validasi role
+  if (!isRole(req.user, 'admin_sa')) {
+    return res.status(403).json({ message: 'Akses ditolak' });
+  }
+
+  // Validasi ID
+  if (!id || isNaN(id)) {
+    return res.status(400).json({ message: 'ID bug report tidak valid' });
+  }
+
+  const transaction = await sequelize.transaction();
+
   try {
-    if (!isRole(req.user, 'admin_sa')) {
-      return res.status(403).json({ message: 'Akses ditolak' });
+    const bug = await BugReport.findByPk(id, { transaction });
+
+    if (!bug) {
+      await transaction.rollback();
+      return res.status(404).json({ message: 'Bug report tidak ditemukan' });
     }
 
-    const bug = await BugReport.findByPk(req.params.id);
-    if (!bug) return res.status(404).json({ message: 'Bug tidak ditemukan' });
-
-    // FIXED: Hapus foto dari Firebase dan BugPhoto table dulu
+    // Hapus foto dari storage dan database
     const photos = await BugPhoto.findAll({
-      where: { id_bug_report: bug.id_bug_report }
+      where: { id_bug_report: bug.id_bug_report },
+      transaction
     });
-    
+
     for (const photo of photos) {
       await deleteFromSupabase(photo.photo_url);
-      await photo.destroy();
+      await photo.destroy({ transaction });
     }
 
     // Hapus history terkait
-    await BugHistory.destroy({ where: { id_bug_report: bug.id_bug_report } });
+    await BugHistory.destroy({
+      where: { id_bug_report: bug.id_bug_report },
+      transaction
+    });
 
     // Hapus bug assign jika ada
-    await BugAssign.destroy({ where: { id_bug_report: bug.id_bug_report } });
+    await BugAssign.destroy({
+      where: { id_bug_report: bug.id_bug_report },
+      transaction
+    });
 
-    // Baru hapus bug utama
-    await bug.destroy();
+    // Hapus bug report
+    await bug.destroy({ transaction });
 
-    res.json({ message: 'Bug dihapus' });
-  } catch (err) {
-    res.status(500).json({ message: 'Gagal menghapus bug', error: err.message });
+    await transaction.commit();
+
+    res.status(200).json({ message: 'Bug report berhasil dihapus' });
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Error delete bug report:', error);
+    res.status(500).json({
+      message: 'Terjadi kesalahan saat menghapus bug report',
+      error: error.message
+    });
   }
 };
 
-// FIXED: getBugStatistics dengan timezone yang benar
+// Mengambil statistik bug report
 const getBugStatistics = async (req, res) => {
-  try {
-    let { tahun } = req.query;
-    if (!tahun) {
-      tahun = new Date().getFullYear(); // default tahun berjalan
-    }
+  let { tahun } = req.query;
 
-    // FIXED: Range dengan UTC explicit untuk menghindari timezone shift
+  // Validasi tahun
+  if (tahun && (isNaN(tahun) || tahun < 2000 || tahun > 2100)) {
+    return res.status(400).json({ message: 'Tahun tidak valid' });
+  }
+  if (!tahun) {
+    tahun = new Date().getFullYear();
+  }
+  try {
+    // Range tanggal dengan UTC
     const startDate = new Date(`${tahun}-01-01T00:00:00.000Z`);
     const endDate = new Date(`${tahun}-12-31T23:59:59.999Z`);
 
@@ -604,47 +874,54 @@ const getBugStatistics = async (req, res) => {
         where: { nik_validator: req.user.nik_validator },
         attributes: ['id_kategori']
       });
+
+      if (kategori.length === 0) {
+        return res.status(200).json({
+          message: 'Belum ada kategori yang ditangani',
+          tahun: parseInt(tahun),
+          total: 0,
+          diajukan: 0,
+          diproses: 0,
+          selesai: 0,
+          pendapat_selesai: 0
+        });
+      }
+
       const idKategoriList = kategori.map(k => k.id_kategori);
       whereCondition.id_bug_category = { [Op.in]: idKategoriList };
-    } else if (!isRole(req.user, 'admin_sa')) {
+    } else if (!isRole(req.user, 'admin_sa', 'admin_kategori')) {
       return res.status(403).json({ message: 'Akses ditolak' });
     }
 
-    console.log('📊 Bug Report Where condition:', whereCondition);
-    console.log('🎯 Date range (UTC):', { startDate, endDate });
+    // Hitung statistik
+    const [total, diajukan, diproses, selesai, pendapatSelesai] = await Promise.all([
+      BugReport.count({ where: whereCondition }),
+      BugReport.count({ where: { ...whereCondition, status: 'diajukan' } }),
+      BugReport.count({ where: { ...whereCondition, status: 'diproses' } }),
+      BugReport.count({ where: { ...whereCondition, status: 'selesai' } }),
+      BugReport.count({ where: { ...whereCondition, status: 'pendapat_selesai' } })
+    ]);
 
-    // Hitung semua statistik
-    const total = await BugReport.count({ where: whereCondition });
-    const diajukan = await BugReport.count({ 
-      where: { ...whereCondition, status: 'diajukan' } 
-    });
-    const diproses = await BugReport.count({ 
-      where: { ...whereCondition, status: 'diproses' } 
-    });
-    const selesai = await BugReport.count({ 
-      where: { ...whereCondition, status: 'selesai' } 
-    });
-    const pendapatSelesai = await BugReport.count({ 
-      where: { ...whereCondition, status: 'pendapat_selesai' } 
+    res.status(200).json({
+      message: 'Statistik bug report berhasil diambil',
+      data: {
+        tahun: parseInt(tahun),
+        total,
+        diajukan,
+        diproses,
+        selesai,
+        pendapat_selesai: pendapatSelesai
+      }
     });
 
-    return res.json({
-      tahun: parseInt(tahun),
-      total,
-      diajukan,
-      diproses,
-      selesai,
-      pendapat_selesai: pendapatSelesai,
-    });
   } catch (error) {
-    console.error('❌ Error in getBugStatistics:', error);
-    return res.status(500).json({ 
-      message: 'Gagal mengambil statistik bug report', 
-      error: error.message 
+    console.error('Error get bug statistics:', error);
+    res.status(500).json({
+      message: 'Terjadi kesalahan saat mengambil statistik bug report',
+      error: error.message
     });
   }
 };
-
 module.exports = {
   createBug,
   getBugs,

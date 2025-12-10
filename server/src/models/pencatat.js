@@ -18,7 +18,11 @@ const Pencatat = sequelize.define('Pencatat', {
   },
   email: {
     type: DataTypes.STRING(100),
-    allowNull: true
+    allowNull: true,
+    unique: {
+    args: true,
+    msg: 'Email sudah terdaftar'
+  }
   },
   alamat: {
     type: DataTypes.STRING(255),
