@@ -35,20 +35,25 @@ const DetailLaporan: React.FC = () => {
   }, [id]);
 
   const handleDelete = async () => {
-    if (!id) return;
-    const konfirmasi = window.confirm(
-      "Apakah Anda yakin ingin menghapus laporan ini?"
-    );
-    if (!konfirmasi) return;
+  if (!id) return;
 
+  const konfirmasi = window.confirm(
+    "Apakah Anda yakin ingin menghapus laporan ini?"
+  );
+  if (!konfirmasi) return;
+
+  try {
     const success = await hapusBugReport(id);
     if (success) {
       alert("Laporan berhasil dihapus.");
       navigate(-1);
-    } else {
-      alert("Gagal menghapus laporan. Coba lagi.");
     }
-  };
+  } catch (err: any) {
+    const msg = err.response?.data?.message || "Gagal menghapus laporan";
+    alert(msg); 
+  }
+};
+
 
   if (!laporan) {
     return <p className="text-center mt-10">Memuat detail laporan...</p>;

@@ -76,11 +76,18 @@ const FormLaporan = () => {
       navigate(-1);
     } catch (err: unknown) {
       console.error("❌ Error kirim laporan:", err);
+
+      let errorMessage = "Gagal mengirim laporan.";
+
       if (axios.isAxiosError(err)) {
-        alert(err.response?.data?.message || "Gagal mengirim laporan");
-      } else {
-        alert("Terjadi kesalahan tak terduga");
+        errorMessage =
+          err.response?.data?.message ||
+          err.response?.data?.error ||
+          err.message ||
+          errorMessage;
       }
+
+      alert(errorMessage);
     }
   };
 

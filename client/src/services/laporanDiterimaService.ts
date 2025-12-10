@@ -139,20 +139,20 @@ export const updateLaporanDiterima = async (
 };
 
 // DELETE bug-assign
-export const hapusLaporanDiterima = async (
-  id: number | string
-): Promise<boolean> => {
+// src/services/laporanDiterimaService.ts
+export const hapusLaporanDiterima = async (id: number | string) => {
   try {
     const token = localStorage.getItem("jwtToken");
-    await api.delete(`/bug-assign/${id}`, {
+    const { data } = await api.delete(`/bug-assign/${id}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    return true;
+    return data;
   } catch (error) {
     console.error("Gagal menghapus laporan diterima:", error);
-    return false;
+    throw error;
   }
 };
+
 
 // GET foto bug-report
 export const fetchBugPhotos = async (

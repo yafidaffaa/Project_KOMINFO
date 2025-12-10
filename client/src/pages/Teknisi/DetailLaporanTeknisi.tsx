@@ -49,12 +49,28 @@ const DetailLaporanTeknisi: React.FC = () => {
         status,
         catatan_teknisi: catatan,
       });
+
       alert("Laporan berhasil diperbarui!");
       navigate(-1);
-    } catch (err) {
-      alert("Gagal menyimpan perubahan");
+    } catch (err: any) {
+      console.error("❌ Error update laporan:", err);
+
+      const res = err.response?.data;
+
+      // error validasi
+      if (res?.errors) {
+        const msgList = Object.values(res.errors)
+          .flat()
+          .join("\n");
+        alert(msgList);
+        return;
+      }
+
+      // error biasa
+      alert(res?.message || "Gagal menyimpan perubahan");
     }
   };
+
 
   if (loading) return <p>Loading...</p>;
   if (!report) return <p>Data tidak ditemukan</p>;

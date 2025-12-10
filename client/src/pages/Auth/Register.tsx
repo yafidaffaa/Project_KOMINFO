@@ -42,9 +42,16 @@ const Register = () => {
       const res = await register(formData);
       alert(res.message);
       navigate("/login");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Registrasi gagal:", err);
-      alert("Registrasi gagal. Cek data Anda.");
+
+      // --- Ambil pesan error dari backend ---
+      const errorMessage =
+        err?.response?.data?.message ||  // axios
+        err?.message ||                  // fallback
+        "Registrasi gagal. Cek data Anda.";  // default
+
+      alert(errorMessage);
     }
   };
 
@@ -80,7 +87,7 @@ const Register = () => {
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-9 text-gray-600"
             >
-           {showPassword ? (
+              {showPassword ? (
                 <EyeSlashIcon className="h-5 w-5" />
               ) : (
                 <EyeIcon className="h-5 w-5" />
@@ -102,12 +109,13 @@ const Register = () => {
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
               className="absolute right-3 top-9 text-gray-600"
             >
-               {showPassword ? (
-                             <EyeSlashIcon className="h-5 w-5" />
-                           ) : (
-                             <EyeIcon className="h-5 w-5" />
-                           )}
+              {showConfirmPassword ? (
+                <EyeSlashIcon className="h-5 w-5" />
+              ) : (
+                <EyeIcon className="h-5 w-5" />
+              )}
             </button>
+
           </div>
 
           <button

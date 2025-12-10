@@ -45,10 +45,17 @@ const Login = () => {
       const targetRoute = roleMap[decoded.role] || "/";
       navigate(targetRoute, { replace: true });
 
-    } catch (err) {
-      alert("Login gagal. Silakan cek kembali username dan password.");
+    } catch (err: any) {
       console.error("Login error:", err);
+
+      const errorMessage =
+        err?.response?.data?.message || // kalau axios
+        err?.message ||                  // fallback
+        "Login gagal. Silakan cek kembali username dan password.";
+
+      alert(errorMessage);
     }
+
   };
 
   return (

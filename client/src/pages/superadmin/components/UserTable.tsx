@@ -46,48 +46,58 @@ const UserTable: React.FC<Props> = ({ role }) => {
   const handleAddUser = async (data: AddUserData) => {
     try {
       const newUser = await addUser(role, data);
-      setUsers((prev) => [...prev, { ...newUser }]);
+      setUsers(prev => [...prev, newUser]);
       setAddModalOpen(false);
     } catch (err: any) {
-      alert("Gagal menambahkan user: " + (err.message || "Unknown error"));
+      const msg = err.response?.data?.message || "Gagal menambahkan user";
+      alert(msg);
     }
   };
 
+
   // Open detail & fetch full user
- const handleOpenDetail = async (user: User) => {
-  console.log("✅ Detail button clicked:", user);
-  setLoading(true);
-  const fullUser = await getUserByNik(role, user.nik);
-  console.log("✅ Full user fetched:", fullUser);
-  setSelectedUser(fullUser);
-  setDetailModalOpen(true);
-  setLoading(false);
-};
+  const handleOpenDetail = async (user: User) => {
+    try {
+      setLoading(true);
+      const fullUser = await getUserByNik(role, user.nik);
+      setSelectedUser(fullUser);
+      setDetailModalOpen(true);
+    } catch (err: any) {
+      const msg = err.response?.data?.message || "Gagal mengambil data user";
+      alert(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   // Edit user
   const handleEditUser = async (data: AddUserData) => {
     if (!selectedUser) return;
+
     try {
       const updatedUser = await editUser(role, selectedUser.nik, data);
-      setUsers((prev) =>
-        prev.map((u) => (u.nik === updatedUser.nik ? updatedUser : u))
-      );
+      setUsers(prev => prev.map(u => u.nik === updatedUser.nik ? updatedUser : u));
       setDetailModalOpen(false);
-    } catch (err) {
-      alert("Gagal edit user");
+    } catch (err: any) {
+      const msg = err.response?.data?.message || "Gagal edit user";
+      alert(msg);
     }
   };
+
 
   // Delete user
   const handleDeleteUser = async (nik: string) => {
     try {
       await deleteUser(role, nik);
-      setUsers((prev) => prev.filter((u) => u.nik !== nik));
+      setUsers(prev => prev.filter(u => u.nik !== nik));
       setDetailModalOpen(false);
-    } catch (err) {
-      alert("Gagal hapus user");
+    } catch (err: any) {
+      const msg = err.response?.data?.message || "Gagal hapus user";
+      alert(msg);
     }
   };
+
 
   return (
     <div className="pt-6 flex-1">
