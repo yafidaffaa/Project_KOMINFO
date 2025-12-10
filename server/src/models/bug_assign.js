@@ -24,9 +24,9 @@ const BugAssign = sequelize.define('BugAssign', {
     allowNull: true
   },
   photo_bug: {
-  type: DataTypes.ENUM('ada', 'tidak ada'),
-  allowNull: false,
-},
+    type: DataTypes.ENUM('ada', 'tidak ada'),
+    allowNull: false,
+  },
   tanggal_penugasan: {
     type: DataTypes.DATE,
     allowNull: false
@@ -75,6 +75,14 @@ const BugAssign = sequelize.define('BugAssign', {
       model: Validator,
       key: 'nik_validator'
     }
+  },
+  created_by: {
+    type: DataTypes.STRING(100),
+    allowNull: true
+  },
+  updated_by: {
+    type: DataTypes.STRING(100),
+    allowNull: true
   }
 }, {
   tableName: 'bug_assign',

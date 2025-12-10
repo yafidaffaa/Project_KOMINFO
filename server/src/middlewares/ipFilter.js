@@ -10,7 +10,8 @@
 // };
 
 // middlewares/ipFilter.js
-const allowedIP = [process.env.IP_FE, process.env.HOST];
+const allowedIP = [process.env.IP_FE, process.env.HOST,
+"127.0.0.1", "::1"];
 
 module.exports = (req, res, next) => {
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';

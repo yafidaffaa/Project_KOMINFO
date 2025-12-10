@@ -16,15 +16,27 @@ const AdminKategori = require('../models/admin_kategori');
 const login = async (req, res) => {
   const { username, password } = req.body;
 
-  try {
-    const akun = await Akun.findOne({ where: { username } });
-    if (!akun) return res.status(401).json({ message: 'Username tidak ditemukan' });
+  // Validasi field wajib
+  if (!username || !password) {
+    return res.status(400).json({ message: 'Username dan password wajib diisi' });
+  }
 
+  try {
+    // Cek apakah username exists
+    const akun = await Akun.findOne({ where: { username } });
+    if (!akun) {
+      return res.status(401).json({ message: 'Username tidak ditemukan' });
+    }
+
+    // Validasi password
     const validPassword = await bcrypt.compare(password, akun.password);
-    if (!validPassword) return res.status(401).json({ message: 'Password salah' });
+    if (!validPassword) {
+      return res.status(401).json({ message: 'Password salah' });
+    }
 
     let profil = null;
 
+    // Ambil profil sesuai role
     switch (akun.role) {
       case 'admin_sa':
         profil = await AdminSA.findOne({ where: { id_akun: akun.id_akun } });
@@ -48,11 +60,11 @@ const login = async (req, res) => {
         return res.status(403).json({ message: 'Role tidak dikenali' });
     }
 
-    if (!profil) return res.status(404).json({ message: 'Data profil tidak ditemukan' });
+    if (!profil) {
+      return res.status(404).json({ message: 'Data profil tidak ditemukan' });
+    }
 
-    // ========================
     // Buat payload JWT
-    // ========================
     let payload = {
       id_akun: akun.id_akun,
       username: akun.username,
@@ -60,24 +72,28 @@ const login = async (req, res) => {
       nama: profil.nama || profil.nama_lengkap
     };
 
-    // Tambahkan nik_user / nik_pencatat sesuai role
+    // Tambahkan NIK sesuai role
     if (akun.role === 'user_umum') {
       payload.nik_user = profil.nik_user;
     } else if (akun.role === 'pencatat') {
       payload.nik_pencatat = profil.nik_pencatat;
-    }else if (akun.role === 'validator') {
+    } else if (akun.role === 'validator') {
       payload.nik_validator = profil.nik_validator;
-    }else if (akun.role === 'teknisi') {
+    } else if (akun.role === 'teknisi') {
       payload.nik_teknisi = profil.nik_teknisi;
     }
 
     const token = jwt.sign(payload, process.env.JWT_SECRET || 'SECRET_KEY', { expiresIn: '1h' });
 
-    res.json({ message: 'Login berhasil', token, profil });
+    res.status(200).json({
+      message: 'Login berhasil',
+      token,
+      profil
+    });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error saat login' });
+    console.error('Error login:', error);
+    res.status(500).json({ message: 'Terjadi kesalahan saat login', error: error.message });
   }
 };
 
@@ -87,22 +103,27 @@ const login = async (req, res) => {
 const register = async (req, res) => {
   const { username, password, konfirmasiPassword, nama, nik_user, email } = req.body;
 
-  // === Validasi input dasar ===
+  // Validasi field wajib
   if (!username || !password || !konfirmasiPassword || !nama || !nik_user) {
-    return res.status(400).json({ message: 'Data wajib tidak lengkap' });
+    return res.status(400).json({ message: 'Username, password, konfirmasi password, nama, dan NIK wajib diisi' });
   }
 
-  // === Validasi password ===
+  // Validasi password match
   if (password !== konfirmasiPassword) {
     return res.status(400).json({ message: 'Password dan konfirmasi password tidak cocok' });
   }
 
-  // === Validasi NIK panjang (16 digit) ===
+  // Validasi panjang username
+  if (username.length > 50) {
+    return res.status(400).json({ message: 'Username maksimal 50 karakter' });
+  }
+
+  // Validasi format NIK
   if (nik_user.length !== 16 || !/^\d+$/.test(nik_user)) {
     return res.status(400).json({ message: 'NIK harus terdiri dari 16 digit angka' });
   }
 
-  // === Validasi email jika ada ===
+  // Validasi email jika ada
   if (email) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
@@ -111,23 +132,42 @@ const register = async (req, res) => {
   }
 
   try {
-    // === Cek apakah username sudah dipakai ===
-    const existing = await Akun.findOne({ where: { username } });
-    if (existing) {
+    // Cek apakah username sudah digunakan
+    const existingUsername = await Akun.findOne({ where: { username } });
+    if (existingUsername) {
       return res.status(409).json({ message: 'Username sudah digunakan' });
     }
 
-    // === Hash password ===
+    // Cek apakah NIK sudah terdaftar
+    const existingNIK = await UserUmum.findOne({ where: { nik_user } });
+    if (existingNIK) {
+      return res.status(409).json({ message: 'NIK sudah terdaftar' });
+    }
+
+    // Cek apakah email sudah digunakan (jika ada)
+    if (email) {
+      const existingEmail = await UserUmum.findOne({ where: { email } });
+      const existingEmailAdminKategori = await AdminKategori.findOne({ where: { email } });
+      const existingEmailAdminSA = await AdminSA.findOne({ where: { email } });
+      const existingEmailPencatat = await Pencatat.findOne({ where: { email } });
+      const existingEmailTeknisi = await Teknisi.findOne({ where: { email } });
+      const existingEmailValidator = await Validator.findOne({ where: { email } });
+      if (existingEmail || existingEmailAdminKategori || existingEmailAdminSA || existingEmailPencatat || existingEmailTeknisi || existingEmailValidator) {
+        return res.status(409).json({ message: 'Email sudah digunakan. Gunakan email yang belum terdaftar' });
+      }
+    }
+
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // === Simpan ke tabel akun ===
+    // Simpan ke tabel akun
     const akunBaru = await Akun.create({
       username,
       password: hashedPassword,
       role: 'user_umum'
     });
 
-    // === Simpan ke tabel user_umum ===
+    // Simpan ke tabel user_umum
     await UserUmum.create({
       nik_user,
       nama,
@@ -146,43 +186,55 @@ const register = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error saat registrasi user umum:', error);
-    return res.status(500).json({ message: 'Terjadi kesalahan saat proses registrasi' });
+    console.error('Error register:', error);
+    return res.status(500).json({ message: 'Terjadi kesalahan saat registrasi', error: error.message });
   }
 };
 
-// 3. Lupa password (request reset)
+// ========================
+// LUPA PASSWORD (REQUEST RESET)
+// ========================
 const forgotPassword = async (req, res) => {
   const { email } = req.body;
 
+  // Validasi email wajib
+  if (!email) {
+    return res.status(400).json({ message: 'Email wajib diisi' });
+  }
+
+  // Validasi format email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ message: 'Format email tidak valid' });
+  }
+
   try {
-    if (!email) return res.status(400).json({ message: 'Email wajib diisi' });
-
-    // cek apakah email ada di database user_umum
+    // Cek apakah email terdaftar
     const user = await UserUmum.findOne({ where: { email }, include: Akun });
-    if (!user) return res.status(404).json({ message: 'Email tidak ditemukan' });
+    if (!user) {
+      return res.status(404).json({ message: 'Email tidak terdaftar' });
+    }
 
-    // generate token reset (expired 5 menit)
+    // Generate token reset (expired 5 menit)
     const resetToken = jwt.sign(
       { id_akun: user.id_akun, email },
       process.env.JWT_SECRET || 'SECRET_KEY',
       { expiresIn: '5m' }
     );
 
-    // buat transporter (pakai Gmail SMTP)
+    // Konfigurasi transporter email
     const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,   // contoh: smtp.gmail.com
-  port: process.env.EMAIL_PORT,   // contoh: 587
-  secure: process.env.EMAIL_PORT == 465, // true kalau pakai port 465 (SSL)
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
+      host: process.env.EMAIL_HOST,
+      port: process.env.EMAIL_PORT,
+      secure: process.env.EMAIL_PORT == 465,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    });
 
-
-    // isi email
-    const resetLink = `http://${process.env.HOST}:3000/auth/reset-password?token=${resetToken}`;
+    // Isi email
+    const resetLink = `http://${process.env.HOST}:5173/auth/reset-password?token=${resetToken}`;
     const mailOptions = {
       from: `"Bug Handling Kominfosan Yogya" <${process.env.EMAIL_USER}>`,
       to: email,
@@ -197,41 +249,62 @@ const forgotPassword = async (req, res) => {
 
     await transporter.sendMail(mailOptions);
 
-    res.json({ message: 'Email reset password berhasil dikirim' });
+    res.status(200).json({ message: 'Email reset password berhasil dikirim' });
+
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Gagal memproses lupa password' });
+    console.error('Error forgot password:', error);
+    res.status(500).json({ message: 'Terjadi kesalahan saat mengirim email reset password', error: error.message });
   }
 };
 
+// ========================
+// RESET PASSWORD
+// ========================
 const resetPassword = async (req, res) => {
   const { token, passwordBaru } = req.body;
 
-  try {
-    if (!token || !passwordBaru) {
-      return res.status(400).json({ message: 'Token dan password baru wajib diisi' });
-    }
+  // Validasi field wajib
+  if (!token || !passwordBaru) {
+    return res.status(400).json({ message: 'Token dan password baru wajib diisi' });
+  }
 
-    // verifikasi token
+  // Validasi panjang password
+  if (passwordBaru.length < 6) {
+    return res.status(400).json({ message: 'Password minimal 6 karakter' });
+  }
+
+  try {
+    // Verifikasi token
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'SECRET_KEY');
 
-    // hash password baru
-    const bcrypt = require('bcrypt');
+    // Cek apakah akun exists
+    const akun = await Akun.findByPk(decoded.id_akun);
+    if (!akun) {
+      return res.status(404).json({ message: 'Akun tidak ditemukan' });
+    }
+
+    // Hash password baru
     const hashedPassword = await bcrypt.hash(passwordBaru, 10);
 
-    // update di tabel akun
-    const akun = await Akun.findByPk(decoded.id_akun);
-    if (!akun) return res.status(404).json({ message: 'Akun tidak ditemukan' });
-
+    // Update password di tabel akun
     akun.password = hashedPassword;
     await akun.save();
 
-    res.json({ message: 'Password berhasil direset' });
+    res.status(200).json({ message: 'Password berhasil direset' });
+
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Token tidak valid atau kadaluarsa' });
+    console.error('Error reset password:', error);
+
+    // Handle JWT errors
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(400).json({ message: 'Token tidak valid' });
+    }
+    if (error.name === 'TokenExpiredError') {
+      return res.status(400).json({ message: 'Token sudah kadaluarsa' });
+    }
+
+    res.status(500).json({ message: 'Terjadi kesalahan saat reset password', error: error.message });
   }
 };
-
 
 module.exports = { login, register, forgotPassword, resetPassword };

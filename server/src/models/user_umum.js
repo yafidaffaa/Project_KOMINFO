@@ -14,7 +14,11 @@ const UserUmum = sequelize.define('UserUmum', {
   },
   email: {
     type: DataTypes.STRING(100),
-    allowNull: true
+    allowNull: true,
+    unique: {
+    args: true,
+    msg: 'Email sudah terdaftar'
+  }
   },
   id_akun: {
     type: DataTypes.INTEGER,

@@ -10,21 +10,23 @@ const isRole = (user, ...roles) => roles.includes(user.role);
 const checkBugReportAccess = async (req, bugReport) => {
   const user = req.user;
   
-  if (isRole(user, 'admin_sa')) return true;
-  if (isRole(user, 'admin_kategori')) return true;
-  if (isRole(user, 'validator')) return true;
-  if (isRole(user, 'teknisi')) return true;
-  if (isRole(user, 'user_umum')) return bugReport.nik_user === user.nik_user;
-  if (isRole(user, 'pencatat')) return bugReport.nik_pencatat === user.nik_pencatat;
+  if (isRole(user, 'admin_sa', 'admin_kategori')) return true;
+  
+  if (isRole(user, 'user_umum')) {
+    return bugReport.nik_user === user.nik_user;
+  }
+  
+  if (isRole(user, 'pencatat')) {
+    return bugReport.nik_pencatat === user.nik_pencatat;
+  }
 
   if (isRole(user, 'validator')) {
-    const kategori = await BugCategory.findByPk(bugReport.id_bug_category);
+    const kategori = await BugCategory.findByPk(bugReport.id_kategori);
     return kategori && kategori.nik_validator === user.nik_validator;
   }
 
   if (isRole(user, 'teknisi')) {
-    const kategori = await BugCategory.findByPk(bugReport.id_bug_category);
-    return kategori && kategori.nik_validator === user.nik_validator;
+    return bugReport.nik_teknisi === user.nik_teknisi;
   }
 
   return false;
@@ -32,16 +34,23 @@ const checkBugReportAccess = async (req, bugReport) => {
 
 // GET photos by bug report ID
 const getPhotosByBugId = async (req, res) => {
+  const { id_bug_report } = req.params;
+
+  // Validasi ID bug report
+  if (!id_bug_report || isNaN(id_bug_report)) {
+    return res.status(400).json({ message: 'ID bug report harus berupa angka' });
+  }
+
   try {
-    const { id_bug_report } = req.params;
     const bug = await BugReport.findByPk(id_bug_report);
     if (!bug) {
       return res.status(404).json({ message: 'Bug report tidak ditemukan' });
     }
 
+    // Cek akses
     const hasAccess = await checkBugReportAccess(req, bug);
     if (!hasAccess) {
-      return res.status(403).json({ message: 'Akses ditolak' });
+      return res.status(403).json({ message: 'Akses ditolak. Anda tidak memiliki izin untuk melihat foto bug report ini' });
     }
 
     const photos = await BugPhoto.findAll({
@@ -49,7 +58,17 @@ const getPhotosByBugId = async (req, res) => {
       order: [['urutan', 'ASC'], ['created_at', 'ASC']]
     });
 
-    res.json({
+    if (photos.length === 0) {
+      return res.status(200).json({
+        message: 'Belum ada foto untuk bug report ini',
+        id_bug_report: parseInt(id_bug_report),
+        total_photos: 0,
+        photos: []
+      });
+    }
+
+    res.status(200).json({
+      message: 'Data foto bug report berhasil diambil',
       id_bug_report: parseInt(id_bug_report),
       total_photos: photos.length,
       photos: photos.map(photo => ({
@@ -61,9 +80,9 @@ const getPhotosByBugId = async (req, res) => {
       }))
     });
   } catch (error) {
-    console.error('Error getting photos:', error);
+    console.error('Error get photos by bug id:', error);
     res.status(500).json({ 
-      message: 'Gagal mengambil foto bug', 
+      message: 'Terjadi kesalahan saat mengambil foto bug report', 
       error: error.message 
     });
   }
@@ -71,34 +90,61 @@ const getPhotosByBugId = async (req, res) => {
 
 // UPLOAD photos for bug report
 const uploadPhotos = async (req, res) => {
-  try {
-    const { id_bug_report } = req.params;
-    const files = req.files || [];
-    
-    if (files.length === 0) {
-      return res.status(400).json({ message: 'Tidak ada file yang diupload' });
-    }
-    if (files.length > 5) {
-      return res.status(400).json({ message: 'Maksimal 5 foto diperbolehkan' });
-    }
+  const { id_bug_report } = req.params;
+  const files = req.files || [];
 
+  // Validasi ID bug report
+  if (!id_bug_report || isNaN(id_bug_report)) {
+    return res.status(400).json({ message: 'ID bug report harus berupa angka' });
+  }
+
+  // Validasi file upload
+  if (files.length === 0) {
+    return res.status(400).json({ message: 'Tidak ada file yang diupload' });
+  }
+
+  if (files.length > 5) {
+    return res.status(400).json({ message: 'Maksimal 5 foto dapat diupload sekaligus' });
+  }
+
+  try {
     const bug = await BugReport.findByPk(id_bug_report);
     if (!bug) {
       return res.status(404).json({ message: 'Bug report tidak ditemukan' });
     }
 
-    // cek upload access
+    // Cek upload access
     const user = req.user;
     let hasUploadAccess = false;
-    if (isRole(user, 'admin_sa')) hasUploadAccess = true;
-    else if (isRole(user, 'user_umum')) hasUploadAccess = bug.nik_user === user.nik_user;
-    else if (isRole(user, 'pencatat')) hasUploadAccess = bug.nik_pencatat === user.nik_pencatat;
+    
+    if (isRole(user, 'admin_sa')) {
+      hasUploadAccess = true;
+    } else if (isRole(user, 'user_umum')) {
+      hasUploadAccess = bug.nik_user === user.nik_user;
+    } else if (isRole(user, 'pencatat')) {
+      hasUploadAccess = bug.nik_pencatat === user.nik_pencatat;
+    }
 
     if (!hasUploadAccess) {
       return res.status(403).json({ message: 'Akses ditolak. Hanya pembuat laporan yang dapat mengupload foto' });
     }
 
-    // validasi semua file
+    // Cek jumlah foto yang sudah ada
+    const existingPhotosCount = await BugPhoto.count({ where: { id_bug_report } });
+    
+    if (existingPhotosCount >= 5) {
+      return res.status(400).json({ 
+        message: 'Bug report sudah memiliki 5 foto (maksimal). Hapus foto lama untuk menambahkan foto baru' 
+      });
+    }
+
+    if (existingPhotosCount + files.length > 5) {
+      return res.status(400).json({ 
+        message: `Total foto tidak boleh melebihi 5. Saat ini sudah ada ${existingPhotosCount} foto, akan ditambah ${files.length} foto` 
+      });
+    }
+
+    // Validasi semua file sebelum upload
     for (const file of files) {
       try {
         validateImageFile(file.buffer, file.originalname, 5);
@@ -109,14 +155,7 @@ const uploadPhotos = async (req, res) => {
       }
     }
 
-    // cek jumlah foto max 5
-    const existingPhotosCount = await BugPhoto.count({ where: { id_bug_report } });
-    if (existingPhotosCount + files.length > 5) {
-      return res.status(400).json({ 
-        message: `Total foto tidak boleh melebihi 5. Saat ini: ${existingPhotosCount}, akan ditambah: ${files.length}` 
-      });
-    }
-
+    // Upload semua foto
     const uploadedPhotos = [];
     try {
       for (let i = 0; i < files.length; i++) {
@@ -138,6 +177,7 @@ const uploadPhotos = async (req, res) => {
         });
       }
 
+      // Update status photo_bug jika belum ada
       if (bug.photo_bug !== 'ada') {
         await bug.update({ photo_bug: 'ada' });
       }
@@ -148,20 +188,21 @@ const uploadPhotos = async (req, res) => {
         photos: uploadedPhotos
       });
     } catch (uploadError) {
+      // Rollback: hapus foto yang sudah terupload jika terjadi error
       for (const photo of uploadedPhotos) {
         try {
           await deleteFromSupabase(photo.photo_url);
           await BugPhoto.destroy({ where: { id_bug_photo: photo.id_bug_photo } });
         } catch (rollbackError) {
-          console.error('Rollback error:', rollbackError);
+          console.error('Error rollback upload:', rollbackError);
         }
       }
       throw uploadError;
     }
   } catch (error) {
-    console.error('Error uploading photos:', error);
+    console.error('Error upload photos:', error);
     res.status(500).json({ 
-      message: 'Gagal upload foto', 
+      message: 'Terjadi kesalahan saat mengupload foto', 
       error: error.message 
     });
   }
@@ -169,24 +210,41 @@ const uploadPhotos = async (req, res) => {
 
 // DELETE photo
 const deletePhoto = async (req, res) => {
+  const { id_bug_photo } = req.params;
+
+  // Validasi ID bug photo
+  if (!id_bug_photo || isNaN(id_bug_photo)) {
+    return res.status(400).json({ message: 'ID foto harus berupa angka' });
+  }
+
   try {
-    const { id_bug_photo } = req.params;
-    const photo = await BugPhoto.findByPk(id_bug_photo, { include: [BugReport] });
+    const photo = await BugPhoto.findByPk(id_bug_photo, { 
+      include: [BugReport] 
+    });
+
     if (!photo) {
       return res.status(404).json({ message: 'Foto tidak ditemukan' });
     }
 
     const user = req.user;
     const bug = photo.BugReport;
+
+    // Cek delete access
     let hasDeleteAccess = false;
-    if (isRole(user, 'admin_sa')) hasDeleteAccess = true;
-    else if (isRole(user, 'user_umum')) hasDeleteAccess = bug.nik_user === user.nik_user;
-    else if (isRole(user, 'pencatat')) hasDeleteAccess = bug.nik_pencatat === user.nik_pencatat;
+    
+    if (isRole(user, 'admin_sa')) {
+      hasDeleteAccess = true;
+    } else if (isRole(user, 'user_umum')) {
+      hasDeleteAccess = bug.nik_user === user.nik_user;
+    } else if (isRole(user, 'pencatat')) {
+      hasDeleteAccess = bug.nik_pencatat === user.nik_pencatat;
+    }
 
     if (!hasDeleteAccess) {
       return res.status(403).json({ message: 'Akses ditolak. Hanya pembuat laporan yang dapat menghapus foto' });
     }
 
+    // Hapus foto dari Supabase
     try {
       await deleteFromSupabase(photo.photo_url);
     } catch (supabaseError) {
@@ -194,9 +252,14 @@ const deletePhoto = async (req, res) => {
     }
 
     const bugReportId = photo.id_bug_report;
+    
+    // Hapus record foto dari database
     await photo.destroy();
 
+    // Cek apakah masih ada foto lain
     const remainingPhotos = await BugPhoto.count({ where: { id_bug_report: bugReportId } });
+    
+    // Update status photo_bug jika sudah tidak ada foto
     if (remainingPhotos === 0) {
       await BugReport.update(
         { photo_bug: 'tidak ada' },
@@ -204,14 +267,14 @@ const deletePhoto = async (req, res) => {
       );
     }
 
-    res.json({ 
+    res.status(200).json({ 
       message: 'Foto berhasil dihapus',
       remaining_photos: remainingPhotos
     });
   } catch (error) {
-    console.error('Error deleting photo:', error);
+    console.error('Error delete photo:', error);
     res.status(500).json({ 
-      message: 'Gagal hapus foto', 
+      message: 'Terjadi kesalahan saat menghapus foto', 
       error: error.message 
     });
   }
