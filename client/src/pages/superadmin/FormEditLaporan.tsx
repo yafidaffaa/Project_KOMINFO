@@ -71,13 +71,27 @@ const FormEditLaporan: React.FC = () => {
             alert(res.message || "Update laporan berhasil ✅");
             navigate(-1);
         } catch (err: unknown) {
-            console.error("❌ Error update laporan:", err);
-            if (axios.isAxiosError(err)) {
-                alert(err.response?.data?.message || "Gagal update laporan");
-            } else {
-                alert("Terjadi kesalahan tak terduga");
-            }
+    console.error("❌ Error update laporan:", err);
+
+    if (axios.isAxiosError(err)) {
+        const res = err.response?.data;
+
+        // Jika backend mengirim detail errors (misal error validasi array/object)
+        if (res?.errors) {
+            const msgList = Object.values(res.errors)
+                .flat()
+                .join("\n");
+            alert(msgList);
+            return;
         }
+
+        // Default: ambil message
+        alert(res?.message || "Gagal update laporan");
+    } else {
+        alert("Terjadi kesalahan tak terduga");
+    }
+}
+
     };
 
     return (

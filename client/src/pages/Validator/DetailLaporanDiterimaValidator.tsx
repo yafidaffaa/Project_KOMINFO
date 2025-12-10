@@ -17,20 +17,19 @@ const DetailLaporanDiterimaValidator: React.FC = () => {
     const [report, setReport] = useState<BugAssign | null>(null);
     const [loading, setLoading] = useState(true);
     const [keterangan, setKeterangan] = useState("");
+    const [showTolakForm, setShowTolakForm] = useState(false);
 
-    // 🔥 modal foto
+    // modal foto
     const [modalPhotos, setModalPhotos] = useState<string[]>([]);
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number>(0);
 
-    // ...
     useEffect(() => {
         const loadData = async () => {
             if (!id) return;
             const data = await fetchLaporanDiterimaById(id);
             setReport(data);
 
-            // 🔥 langsung ambil foto kalau ada
             if (data?.photo_bug === "ada") {
                 const photoRes = await fetchBugPhotos(data.id_bug_report);
                 if (photoRes && photoRes.photos.length > 0) {
@@ -43,22 +42,36 @@ const DetailLaporanDiterimaValidator: React.FC = () => {
         loadData();
     }, [id]);
 
-
     const handleUpdate = async (valid: boolean) => {
-        if (!id) return;
-        try {
-            await updateLaporanDiterima(id, {
-                ket_validator: keterangan,
-                validasi_validator: valid ? "disetujui" : "tidak_disetujui",
-            });
-            alert(`Perbaikan ${valid ? "diterima" : "ditolak"}!`);
-            navigate(-1);
-        } catch (err) {
-            alert("Gagal memperbarui laporan");
-        }
-    };
+    if (!id) return;
+    try {
+        await updateLaporanDiterima(id, {
+            ket_validator: keterangan,
+            validasi_validator: valid ? "disetujui" : "tidak_disetujui",
+        });
 
-    // 🔥 buka foto kalau ada
+        alert(`Perbaikan ${valid ? "diterima" : "ditolak"}!`);
+        navigate(-1);
+
+    } catch (err: any) {
+        console.error("❌ Error update laporan:", err);
+
+        const res = err.response?.data;
+
+        // Jika backend kirim errors: {...}
+        if (res?.errors) {
+            const msg = Object.values(res.errors)
+                .flat()
+                .join("\n");
+            alert(msg);
+            return;
+        }
+
+        // Jika backend kirim message: "..."
+        alert(res?.message || "Gagal memperbarui laporan");
+    }
+};
+
     const handleShowPhotos = async () => {
         if (!report) return;
         if (report.photo_bug === "ada") {
@@ -133,7 +146,7 @@ const DetailLaporanDiterimaValidator: React.FC = () => {
                                     minute: "2-digit",
                                 })}
                             </td>
-                            <td className="p-2 border">{report.BugReport?.nik_user || "-"}</td>
+                            <td className="p-2 border">{report.nama_pelapor || "-"}</td>
                             <td className="p-2 border font-bold">{report.status || "-"}</td>
                             <td className="p-2 border">{report.validasi_validator || "-"}</td>
                             <td className="p-2 border">{report.ket_validator || "-"}</td>
@@ -167,31 +180,55 @@ const DetailLaporanDiterimaValidator: React.FC = () => {
                         <p>{report.deskripsi}</p>
                     </div>
 
-                    <div>
-                        <p className="font-bold">Keterangan Validator</p>
-                        <textarea
-                            value={keterangan}
-                            onChange={(e) => setKeterangan(e.target.value)}
-                            placeholder="Tuliskan Keterangan anda disini..."
-                            className="w-full border rounded-lg px-3 py-2"
-                            rows={3}
-                        />
-                    </div>
+                    {/* Jika sedang menolak laporan */}
+                    {showTolakForm ? (
+                        <div className="space-y-4">
+                            <div>
+                                <p className="font-bold">Keterangan Penolakan</p>
+                                <textarea
+                                    value={keterangan}
+                                    onChange={(e) => setKeterangan(e.target.value)}
+                                    placeholder="Tuliskan alasan penolakan disini..."
+                                    className="w-full border rounded-lg px-3 py-2"
+                                    rows={3}
+                                />
+                            </div>
+                            <div className="flex gap-4">
+                                <Button
+                                    onClick={() => handleUpdate(false)}
+                                    disabled={!keterangan.trim()} // ✅ tombol disable jika kosong
+                                    className={`px-6 py-2 rounded-full text-white ${keterangan.trim()
+                                            ? "bg-red-600 hover:bg-red-700"
+                                            : "bg-gray-300 cursor-not-allowed"
+                                        }`}
+                                >
+                                    Konfirmasi Penolakan
+                                </Button>
 
-                    <div className="flex gap-4">
-                        <Button
-                            onClick={() => handleUpdate(true)}
-                            className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-full"
-                        >
-                            Terima
-                        </Button>
-                        <Button
-                            onClick={() => handleUpdate(false)}
-                            className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-full"
-                        >
-                            Tolak
-                        </Button>
-                    </div>
+                                <Button
+                                    onClick={() => setShowTolakForm(false)}
+                                    className="bg-gray-400 hover:bg-gray-500 text-white px-6 py-2 rounded-full"
+                                >
+                                    Batal
+                                </Button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex gap-4">
+                            <Button
+                                onClick={() => handleUpdate(true)}
+                                className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-full"
+                            >
+                                Terima
+                            </Button>
+                            <Button
+                                onClick={() => setShowTolakForm(true)}
+                                className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-full"
+                            >
+                                Tolak
+                            </Button>
+                        </div>
+                    )}
                 </div>
 
                 {/* KANAN */}
@@ -229,11 +266,10 @@ const DetailLaporanDiterimaValidator: React.FC = () => {
                             <p>-</p>
                         )}
                     </div>
-
                 </div>
             </div>
 
-            {/* 🔥 Modal Foto */}
+            {/* Modal Foto */}
             {modalOpen && modalPhotos.length > 0 && (
                 <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
                     <button
