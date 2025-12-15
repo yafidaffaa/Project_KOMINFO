@@ -32,13 +32,22 @@ const StatsCards: React.FC = () => {
   };
 
   // helper buat convert object ke array StatItem[]
-  const mapToStats = (data: object): StatItem[] => {
-    return Object.entries(data).map(([key, value]) => ({
+const mapToStats = (response: Record<string, any>): StatItem[] => {
+  const source = response.data ?? response;
+
+  return Object.entries(source)
+    .filter(([_, value]) => typeof value === "string" || typeof value === "number")
+    .map(([key, value]) => ({
       label: formatLabel(key),
-      value: value as number | string,
+      value: value as string | number, // ✅ aman karena sudah difilter
       color: getColor(key),
     }));
-  };
+};
+
+
+
+
+
 
   useEffect(() => {
     const fetchStats = async () => {

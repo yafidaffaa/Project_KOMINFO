@@ -21,7 +21,7 @@ const ROLE_FIELDS: Record<
     { name: "username", placeholder: "Username" },
     { name: "password", placeholder: "Password", type: "password" },
     { name: "confirmPassword", placeholder: "Konfirmasi Password", type: "password" },
-    { name: "nik", placeholder: "NIK" },
+    { name: "nik", placeholder: "NIK (16 digit)" },
   ],
   admin: [
     { name: "nama", placeholder: "Nama" },
@@ -30,8 +30,8 @@ const ROLE_FIELDS: Record<
     { name: "password", placeholder: "Password", type: "password" },
     { name: "alamat", placeholder: "Alamat" },
     { name: "no_hp", placeholder: "No HP" },
-    { name: "nik", placeholder: "NIK" },
-    { name: "nip", placeholder: "NIP" },
+    { name: "nik", placeholder: "NIK (16 digit)" },
+    { name: "nip", placeholder: "NIP (18 digit)" },
   ],
   pencatat: [
     { name: "nama", placeholder: "Nama" },
@@ -40,8 +40,8 @@ const ROLE_FIELDS: Record<
     { name: "password", placeholder: "Password", type: "password" },
     { name: "alamat", placeholder: "Alamat" },
     { name: "no_hp", placeholder: "No HP" },
-    { name: "nik", placeholder: "NIK" },
-    { name: "nip", placeholder: "NIP" },
+    { name: "nik", placeholder: "NIK (16 digit)" },
+    { name: "nip", placeholder: "NIP (18 digit)" },
   ],
   validator: [
     { name: "nama", placeholder: "Nama" },
@@ -50,8 +50,8 @@ const ROLE_FIELDS: Record<
     { name: "password", placeholder: "Password", type: "password" },
     { name: "alamat", placeholder: "Alamat" },
     { name: "no_hp", placeholder: "No HP" },
-    { name: "nik", placeholder: "NIK" },
-    { name: "nip", placeholder: "NIP" },
+    { name: "nik", placeholder: "NIK (16 digit)" },
+    { name: "nip", placeholder: "NIP (18 digit)" },
   ],
   teknisi: [
     { name: "nama", placeholder: "Nama" },
@@ -60,8 +60,8 @@ const ROLE_FIELDS: Record<
     { name: "password", placeholder: "Password", type: "password" },
     { name: "alamat", placeholder: "Alamat" },
     { name: "no_hp", placeholder: "No HP" },
-    { name: "nik", placeholder: "NIK" },
-    { name: "nip", placeholder: "NIP" },
+    { name: "nik", placeholder: "NIK (16 digit)" },
+    { name: "nip", placeholder: "NIP (18 digit)" },
     { name: "nik_validator", placeholder: "Validator" },
   ],
 };
