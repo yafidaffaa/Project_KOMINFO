@@ -68,7 +68,7 @@ const Register = () => {
         <h2 className="text-3xl md:text-4xl italic mb-8">Daftar</h2>
 
         <form className="w-full max-w-sm space-y-4" onSubmit={handleSubmit}>
-          <InputField id="nik_user" label="NIK" value={formData.nik_user} onChange={handleChange} />
+          <InputField id="nik_user" label="NIK (16 digit)" value={formData.nik_user} onChange={handleChange} />
           <InputField id="nama" label="Nama" value={formData.nama} onChange={handleChange} />
           <InputField id="email" label="Email" value={formData.email} onChange={handleChange} />
           <InputField id="username" label="Username" value={formData.username} onChange={handleChange} />
